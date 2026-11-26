@@ -1,6 +1,6 @@
 /* Service worker : l'appli s'ouvre hors ligne. Les fichiers de l'appli sont servis depuis le cache
    et mis à jour en arrière-plan (la nouvelle version s'affiche au lancement suivant). */
-const CACHE = "journal-calories-v1";
+const CACHE = "journal-calories-v2";
 const SHELL = ["./", "index.html", "shim.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {

@@ -75,6 +75,25 @@
     return e;
   }
   var toast=function(m){var t=document.getElementById("toast");if(!t) return;t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(function(){t.hidden=true;},3500);};
+
+  async function importFile(ev){
+    var f=ev.target.files[0];ev.target.value="";if(!f) return;
+    try{
+      var d=JSON.parse(await f.text());
+      if(!d||typeof d["journal-calories-v2"]!=="string") throw new Error("format");
+      JSON.parse(d["journal-calories-v2"]);
+      if(!confirm("Remplacer les données de cet appareil par cette sauvegarde ?")) return;
+      localStorage.setItem("journal-calories-v2",d["journal-calories-v2"]);
+      if(d["journal-calories-pid"]) localStorage.setItem("journal-calories-pid",d["journal-calories-pid"]);
+      location.reload();
+    }catch(e){toast("Ce fichier n’est pas une sauvegarde valide.");}
+  }
+  // Bouton « Importer une sauvegarde » affiché sur l'écran « Qui est-ce ? »
+  window.standaloneImportButton=function(){
+    var file=el("input",{type:"file",accept:"application/json,.json",hidden:"",onchange:function(ev){importFile(ev);}});
+    var btn=el("button",{type:"button",class:"btn",text:"Importer une sauvegarde",onclick:function(){file.click();}});
+    return el("div",{style:"display:flex;justify-content:center;margin-top:10px"},[btn,file]);
+  };
   window.standaloneSettings=function(onKeyChange){
     var box=el("div",{style:"margin-top:22px;border-top:1px solid var(--line);padding-top:16px;display:flex;flex-direction:column;gap:10px"});
     box.append(el("h3",{text:"Estimation par Claude"}));
@@ -110,18 +129,7 @@
       a.download="journal-calories-sauvegarde-"+new Date().toISOString().slice(0,10)+".json";
       document.body.append(a);a.click();a.remove();
     }});
-    var file=el("input",{type:"file",accept:"application/json,.json",hidden:"",onchange:async function(ev){
-      var f=ev.target.files[0];ev.target.value="";if(!f) return;
-      try{
-        var d=JSON.parse(await f.text());
-        if(!d||typeof d["journal-calories-v2"]!=="string") throw new Error("format");
-        JSON.parse(d["journal-calories-v2"]);
-        if(!confirm("Remplacer les données de cet appareil par cette sauvegarde ?")) return;
-        localStorage.setItem("journal-calories-v2",d["journal-calories-v2"]);
-        if(d["journal-calories-pid"]) localStorage.setItem("journal-calories-pid",d["journal-calories-pid"]);
-        location.reload();
-      }catch(e){toast("Ce fichier n’est pas une sauvegarde valide.");}
-    }});
+    var file=el("input",{type:"file",accept:"application/json,.json",hidden:"",onchange:function(ev){importFile(ev);}});
     var imp=el("button",{type:"button",class:"btn",text:"Importer une sauvegarde",onclick:function(){file.click();}});
     box.append(el("div",{class:"row",style:"gap:8px;flex-wrap:wrap"},[exp,imp,file]));
     return box;
