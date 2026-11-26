@@ -529,7 +529,7 @@ function makePhotos(rerender){
   return P;
 }
 const ERR={
-  not_granted:"L’estimation par Claude n’est pas autorisée. Tu peux ajouter les lignes à la main.",
+  not_granted:window.STANDALONE?"La clé API est refusée ou absente. Vérifie-la dans Réglages.":"L’estimation par Claude n’est pas autorisée. Tu peux ajouter les lignes à la main.",
   sampling_disabled:"L’estimation par Claude n’est pas disponible sur ce compte.",
   rate_limited:"Trop de demandes ou limite d’usage atteinte. Réessaie un peu plus tard.",
   image_rejected:"Une photo n’a pas pu être lue. Essaie un autre fichier (JPEG ou PNG).",
@@ -1641,7 +1641,7 @@ document.addEventListener("keydown",ev=>{
 
 /* ---------- Démarrage ---------- */
 const use=n=>window.claude&&window.claude.use?window.claude.use(n):Promise.resolve(null);
-const NOSAMPLE=window.STANDALONE?"Pour estimer avec Claude, ajoute ta clé API dans Réglages (section « Estimation par Claude »). Tu peux quand même ajouter les lignes à la main.":"Claude n’est pas joignable depuis cette vue, donc pas d’estimation. Ouvre le journal depuis l’onglet Artifacts de l’appli Claude (pas depuis un raccourci), puis réessaie. Tu peux quand même ajouter les lignes à la main.";
+const NOSAMPLE=window.STANDALONE?"Pour estimer, ajoute une clé API dans Réglages (section « Estimation par IA »). Une clé Gemini gratuite suffit. Tu peux quand même ajouter les lignes à la main.":"Claude n’est pas joignable depuis cette vue, donc pas d’estimation. Ouvre le journal depuis l’onglet Artifacts de l’appli Claude (pas depuis un raccourci), puis réessaie. Tu peux quand même ajouter les lignes à la main.";
 async function loadSample(){
   try{
     S.sample=await use("sample");
@@ -1696,6 +1696,7 @@ async function init(){
       else{
         const old=JSON.parse(localStorage.getItem("journal-calories-v1")||"null");
         if(old) S.data={main:{days:old.days||{},settings:{...DEFAULTS,...(old.settings||{})}}};
+        else if(window.DEFAULT_PROFILES) S.profiles=JSON.parse(JSON.stringify(window.DEFAULT_PROFILES));
       }
     }catch(e){}
     pickActive();
