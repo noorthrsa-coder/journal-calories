@@ -537,7 +537,7 @@ const ERR={
   session_expired:"Session expirée. Recharge la page.",
   refused:"Cette demande n’a pas pu être traitée. Reformule la description."
 };
-const errText=e=>(e&&e.code==="cancelled")?"":(ERR[e&&e.code]||"L’estimation a échoué. Réessaie.");
+const errText=e=>(e&&e.code==="cancelled")?"":((ERR[e&&e.code]||"L’estimation a échoué. Réessaie.")+(window.STANDALONE&&e&&e.message?" ("+String(e.message).slice(0,160)+")":""));
 async function ask(prompt,photos,holder){
   holder.ctl=new AbortController();
   const opts={signal:holder.ctl.signal,cache:false};

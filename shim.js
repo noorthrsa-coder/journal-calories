@@ -92,10 +92,10 @@
     if(/image|mime/i.test(msg)) return {code:"image_rejected",message:msg};
     return {code:"failed",message:msg||("Erreur "+resp.status)};
   }
-  async function callGemini(input,opts,wantJson,retried){
+  async function callGemini(input,opts,wantJson,retried,forceLite){
     if(!keyOf("gemini")) throw {code:"not_granted"};
     var models=await gemModels(false);
-    var model=(opts.modelTier==="quick"?models.lite:models.main)||models.main;
+    var model=((opts.modelTier==="quick"||forceLite)?models.lite:models.main)||models.main;
     var parts=[];
     for(var blob of (opts.images||[])){
       parts.push({inline_data:{mime_type:blob.type||"image/jpeg",data:await toB64(blob)}});
@@ -113,7 +113,11 @@
     }catch(e){throw netErr(e);}
     if(!resp.ok){
       var err=await gemError(resp);
-      if(err.code==="model_missing"&&!retried){ls.del(K_MODEL);return callGemini(input,opts,wantJson,true);}
+      if(err.code==="model_missing"&&!retried){ls.del(K_MODEL);return callGemini(input,opts,wantJson,true,forceLite);}
+      // le modèle principal n'est pas toujours ouvert à l'offre gratuite : on retente avec le modèle léger
+      if(!forceLite&&opts.modelTier!=="quick"&&models.lite&&models.lite!==model&&(err.code==="rate_limited"||err.code==="failed"||err.code==="model_missing"||err.code==="not_granted")){
+        return callGemini(input,opts,wantJson,retried,true);
+      }
       throw err;
     }
     var data=await resp.json();
@@ -205,7 +209,7 @@
     var test=el("button",{type:"button",class:"btn",text:"Tester",onclick:async function(){
       msg.textContent="Test en cours…";
       try{await call("Réponds seulement : ok",{modelTier:"quick",maxTokens:20},false);msg.textContent="La clé fonctionne.";}
-      catch(e){msg.textContent=e&&e.code==="not_granted"?"Clé refusée ou absente.":e&&e.code==="rate_limited"?(cur==="gemini"?"Limite gratuite atteinte pour le moment. Réessaie plus tard.":"Limite atteinte ou crédit insuffisant sur ton compte Anthropic."):e&&e.code==="network"?"Pas de connexion.":("Échec du test"+(e&&e.message?" : "+e.message:"."));}
+      catch(e){msg.textContent=e&&e.code==="not_granted"?("Clé refusée ou absente"+(e.message?" — réponse du serveur : "+String(e.message).slice(0,200):".")):e&&e.code==="rate_limited"?(cur==="gemini"?"Limite gratuite atteinte pour le moment. Réessaie plus tard.":"Limite atteinte ou crédit insuffisant sur ton compte Anthropic."):e&&e.code==="network"?"Pas de connexion.":("Échec du test"+(e&&e.message?" : "+e.message:"."));}
     }});
     var delBtn=el("button",{type:"button",class:"btn",text:"Retirer la clé",onclick:function(){
       ls.del(cur==="claude"?K_ANTH:K_GEM);ls.del(K_MODEL);rebuild();msg.textContent="Clé retirée.";onKeyChange&&onKeyChange();
