@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Journal calories</title>
+<meta name="theme-color" content="#0f7b55">
+<meta name="description" content="Journal de calories : repas, activités, recettes, poids, plusieurs profils.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="./icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<script src="shim.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: une colonne étroite. Deux vues (Journal, Recettes) sous un en-tête avec profil et réglages. */
+:root{
+  --bg:#f2f5f0; --surface:#ffffff; --ink:#14211a; --muted:#5b6b62; --line:#dde4dd;
+  --accent:#0d7a58; --accent-ink:#ffffff; --soft:#e6efe8; --warn:#b3540a; --act:#2461a8;
+  --font-display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --font-body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:14px; --r2:10px; --pat:color-mix(in srgb, var(--accent) 14%, transparent);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1612; --surface:#16211b; --ink:#e6efe9; --muted:#97a89d; --line:#26362d;
+    --accent:#3fcf9f; --accent-ink:#06130d; --soft:#1c2a22; --warn:#f0a24c; --act:#7db2ee;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1612; --surface:#16211b; --ink:#e6efe9; --muted:#97a89d; --line:#26362d;
+  --accent:#3fcf9f; --accent-ink:#06130d; --soft:#1c2a22; --warn:#f0a24c; --act:#7db2ee;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background-color:var(--bg);background-attachment:fixed;color:var(--ink);font:400 16px/1.45 var(--font-body);-webkit-text-size-adjust:100%}
+.wrap{max-width:1160px;margin:0 auto;padding:16px 16px 72px;display:flex;flex-direction:column;gap:14px}
+/* Mobile : une vue à la fois. Large écran : journal à gauche, panneau recettes / nouvelle recette / semaine à droite. */
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+#mainTabs{display:flex}
+#sideTabs{display:none}
+@media (min-width:960px){
+  .layout{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:20px;align-items:start}
+  #mainTabs{display:none}
+  #sideTabs{display:flex}
+  #side{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto;padding-right:2px}
+}
+.view{display:flex;flex-direction:column;gap:14px}
+h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+@media (max-width:720px){input[type=text],input[type=number],textarea,select{font-size:16px}}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.card{-webkit-backdrop-filter:blur(var(--blur,0px));backdrop-filter:blur(var(--blur,0px));background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header.top h1{font-size:22px;font-weight:700;letter-spacing:-.01em}
+.chip{font-size:12px;padding:3px 9px;border-radius:99px;background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+.chip.bad{color:var(--warn);border-color:var(--warn)}
+.iconbtn{background:transparent;border:1px solid var(--line);border-radius:var(--r2);padding:7px 11px;color:var(--ink)}
+.iconbtn:hover{background:var(--soft)}
+.profbtn{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 5px}
+.avatar{display:inline-flex;align-items:center;justify-content:center;border-radius:24%;font-family:var(--font-display);font-weight:700;flex:none;transition:transform .15s,box-shadow .15s;line-height:1}
+.gate{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;display:flex;flex-direction:column;align-items:center;gap:26px;padding:32px 16px}
+.gate>:first-child{margin-top:auto}
+.gate>:last-child{margin-bottom:auto}
+.gate[hidden]{display:none}
+.filebtn{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;user-select:none}
+.filebtn.small{padding:6px 10px;font-size:14px}
+.filebtn .fileov{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0;border:0;padding:0;margin:0}
+.cropwrap{position:fixed;inset:0;z-index:40;background:rgba(8,12,10,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px;color:#fff;overflow:auto}
+.cropwrap[hidden]{display:none}
+.cropwrap .btn:not(.primary){color:#14211a;background:#fff;border-color:#fff}
+.cropwrap h2{font-size:19px;color:#fff}
+.cropwrap .hintw{font-size:13px;color:#d7e0da;text-align:center;margin:0}
+.cropview{position:relative;border-radius:24%;overflow:hidden;touch-action:none;cursor:grab;box-shadow:0 0 0 2px #fff;background:#000}
+.cropview canvas{display:block;width:100%;height:100%}
+.cropwrap input[type=range]{width:min(320px,80vw)}
+.gate h1{font-size:clamp(28px,6vw,44px);letter-spacing:-.02em;text-align:center}
+.tiles{display:flex;flex-wrap:wrap;gap:20px;justify-content:center;max-width:780px}
+.tile{display:flex;flex-direction:column;align-items:center;gap:10px;background:none;border:0;padding:6px;color:var(--muted);width:132px;font-size:16px}
+.tile .av{position:relative;display:block}
+.tile:hover,.tile:focus-visible{color:var(--ink)}
+.tile:hover .avatar,.tile:focus-visible .avatar{transform:scale(1.06);box-shadow:0 0 0 3px var(--ink)}
+.tile .nm{max-width:124px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tile.add .avatar{background:transparent;border:2px dashed var(--line);color:var(--muted);font-size:46px;font-weight:500}
+.tile .pen{position:absolute;inset:0;border-radius:24%;background:rgba(0,0,0,.5);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600}
+.gateform{width:min(440px,100%);display:flex;flex-direction:column;gap:12px}
+.gateform .top{display:flex;align-items:center;gap:14px}
+.gateform .top input{flex:1}
+.icons{display:flex;flex-wrap:wrap;gap:6px}
+.icons .pill{padding:4px 9px;min-width:38px;font-size:18px}
+@media (prefers-reduced-motion:reduce){.avatar{transition:none}}
+
+.tabs{display:flex;gap:6px}
+.tabs .pill{flex:1 1 auto;min-width:0;font-weight:600;white-space:nowrap}
+@media (max-width:720px){.tabs{gap:4px}.tabs .pill{padding:9px 6px;font-size:14px}}
+
+.datebar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.datebar .label{flex:1;min-width:140px;text-align:center;font-family:var(--font-display);font-weight:700;font-size:19px;text-transform:capitalize}
+.datebar .label small{display:block;font:400 12px var(--font-body);color:var(--muted);text-transform:none}
+.datebar{position:relative}
+.pill{border:1px solid var(--line);background:var(--surface);border-radius:var(--r2);padding:8px 12px;min-width:42px}
+.pill:hover{background:var(--soft)}
+.pill.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+
+.summary .big{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.summary .big b{font:700 44px/1 var(--font-display);letter-spacing:-.02em}
+.summary .big span{color:var(--muted)}
+.summary .big.over b{color:var(--warn)}
+.bar{height:10px;border-radius:99px;background:var(--soft);overflow:hidden;margin:12px 0 10px}
+.bar>i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .25s}
+.bar.over>i{background:var(--warn)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{display:flex;flex-direction:column}
+.stat small{color:var(--muted);font-size:12px}
+.stat b{font:600 18px var(--font-display)}
+.macros{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+.macro small{display:block;color:var(--muted);font-size:12px}
+.macro b{font:600 15px var(--font-display)}
+.macro .mini{height:4px;border-radius:9px;background:var(--soft);margin-top:4px;overflow:hidden}
+.macro .mini i{display:block;height:100%;background:var(--accent)}
+.weightrow{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;color:var(--muted)}
+.weightrow input{width:84px}
+.weightrow .btn{padding:8px 12px}
+.wchart svg{width:100%;height:auto;display:block}
+.wchart .grid{stroke:var(--line);stroke-width:1}
+.wchart .ln{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.wchart .dot{fill:var(--surface);stroke:var(--accent);stroke-width:2}
+.wchart text{fill:var(--muted);font-size:11px}
+.wlist{display:flex;flex-direction:column;gap:2px;margin-top:10px}
+.wlist button{display:flex;justify-content:space-between;background:none;border:0;border-bottom:1px solid var(--line);padding:9px 2px;text-align:left}
+
+input[type=text],input[type=number],textarea,select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:var(--r2);padding:9px 11px}
+textarea{resize:vertical;min-height:84px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+
+.composer h2,.recipenew h2{font-size:17px;margin-bottom:10px}
+.seg{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.seg .pill{padding:6px 11px;font-size:14px}
+.photos{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.thumb{position:relative;width:60px;height:60px;border-radius:var(--r2);overflow:hidden;border:1px solid var(--line)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb button{position:absolute;top:2px;right:2px;width:26px;height:26px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;font-size:12px;line-height:1;padding:0}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:var(--r2);padding:9px 14px;font-weight:500}
+.btn:hover{background:var(--soft)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.danger{color:var(--warn);border-color:var(--warn)}
+.btn.small{padding:6px 10px;font-size:14px}
+.btn[disabled]{opacity:.5;cursor:default}
+.spacer{flex:1}
+.recents{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.recents .pill{font-size:13px;padding:4px 10px;border-radius:99px}
+.hint{font-size:12px;color:var(--muted);margin-top:12px}
+.err{color:var(--warn);font-size:14px;margin-top:8px}
+
+.draft{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.draft h3{font-size:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.item{display:grid;grid-template-columns:1fr 84px 36px;gap:8px;align-items:start}
+.item .sub{grid-column:1/2;font-size:12px;color:var(--muted);margin-top:-4px}
+.item .x,.ing .x{border:0;background:transparent;color:var(--muted);font-size:20px;padding:4px 6px;min-width:36px;min-height:36px}
+.hyp{margin:0;padding-left:18px;color:var(--muted);font-size:14px}
+.total{display:flex;justify-content:space-between;font-weight:600}
+.tot2{font-size:13px;color:var(--muted)}
+
+.meal header{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.meal h3{font-size:17px}
+.meal header b{font:600 17px var(--font-display)}
+.entry{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line);width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;border-radius:0}
+.entry:hover{background:var(--soft)}
+.entry .n{font-weight:500}
+.entry .q{display:block;font-size:13px;color:var(--muted)}
+.entry .k{white-space:nowrap;font-weight:600}
+.entry .k small{display:block;font-weight:400;color:var(--muted);font-size:12px;text-align:right}
+.empty{color:var(--muted);font-size:14px;padding:6px 0 2px;border-top:1px solid var(--line)}
+.addline{margin-top:6px;background:none;border:0;color:var(--accent);padding:6px 0;font-weight:500}
+.editor{border-top:1px solid var(--line);padding:12px 0;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.editor .wide{grid-column:1/-1}
+.editor .actions{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}
+.act header b{color:var(--act)}
+
+.week h3{font-size:17px;margin-bottom:12px}
+.bars{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;height:130px;position:relative;align-items:end}
+.bars .goal{position:absolute;left:0;right:0;border-top:1px dashed var(--muted);pointer-events:none}
+.bars .goal span{position:absolute;right:0;top:-18px;font-size:11px;color:var(--muted);background:var(--surface);padding-left:4px}
+.col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;background:none;border:0;padding:0;gap:3px}
+.col i{display:block;width:100%;max-width:34px;border-radius:6px 6px 2px 2px;background:var(--soft);min-height:3px}
+.col.has i{background:var(--accent)}
+.col.over i{background:var(--warn)}
+.col.sel i{outline:2px solid var(--ink);outline-offset:1px}
+.labels{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:6px;text-align:center;font-size:12px;color:var(--muted)}
+.labels b{display:block;color:var(--ink);font-weight:600}
+
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.settings .wide{grid-column:1/-1}
+.settings h3{grid-column:1/-1;font-size:17px}
+.settings hr{grid-column:1/-1;width:100%;border:0;border-top:1px solid var(--line);margin:4px 0}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:14px}
+.check input{margin-top:3px}
+.prof{grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.prof input[type=text]{flex:1;min-width:120px}
+.swatch{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);padding:0}
+.swatch.on{outline:2px solid var(--ink);outline-offset:2px}
+.prof input[type=color]{flex:none;width:38px;height:32px;padding:2px;border-radius:var(--r2);border:1px solid var(--line);background:var(--bg)}
+.sublabel{grid-column:1/-1;font-size:12px;color:var(--muted);margin-bottom:-4px}
+
+/* Recettes */
+.rcard h3{font-size:17px}
+.rcard .line{font-size:14px;color:var(--muted);margin-top:2px}
+.rcard .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.rcard ul,.rcard ol{margin:8px 0 0;padding-left:20px;font-size:14px}
+.rcard li{margin:2px 0}
+.addbox{margin-top:10px;padding:10px;border-radius:var(--r2);background:var(--soft);display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.addbox label{min-width:110px;flex:1}
+.ing{display:grid;grid-template-columns:1fr 100px 36px;gap:6px 8px;align-items:start;padding:8px 0;border-top:1px solid var(--line)}
+.ing .mac{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.rhead{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.rhead .wide{grid-column:1/-1}
+
+.cal{position:absolute;top:calc(100% + 6px);right:0;z-index:4;width:292px;max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;box-shadow:0 8px 28px rgba(0,0,0,.18)}
+.cal .ch{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.cal .ch b{font-family:var(--font-display);text-transform:capitalize}
+.cal .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+.cal .dow{font-size:11px;color:var(--muted);padding:2px 0}
+.cal .d{border:1px solid transparent;background:none;border-radius:8px;padding:6px 0;font-size:14px;position:relative}
+.cal .d:hover{background:var(--soft)}
+.cal .d.today{border-color:var(--accent)}
+.cal .d.sel{background:var(--accent);color:var(--accent-ink)}
+.cal .d.has::after{content:"";position:absolute;left:50%;bottom:2px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--accent)}
+.cal .d.sel.has::after{background:var(--accent-ink)}
+.cal .d.out{color:var(--muted);opacity:.55}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:12px;display:flex;gap:12px;align-items:center;font-size:14px;max-width:calc(100% - 32px);z-index:5}
+.toast button{background:none;border:0;color:inherit;text-decoration:underline;padding:0}
+[hidden]{display:none!important}
+@media (max-width:420px){.stats .stat b{font-size:16px}.summary .big b{font-size:38px}.macro b{font-size:14px}}
+@media (prefers-reduced-motion:reduce){.bar>i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Journal calories</h1>
+    <div class="row">
+      <button id="profBtn" class="iconbtn profbtn" type="button" aria-label="Changer de profil"></button>
+      <span id="status" class="chip" hidden></span>
+      <button id="btnSettings" class="iconbtn" type="button" aria-expanded="false">Réglages</button>
+    </div>
+  </header>
+
+  <section id="settings" class="card settings" hidden></section>
+
+  <nav id="mainTabs" class="tabs" aria-label="Vue"></nav>
+
+  <div class="layout">
+    <div id="viewJournal" class="view">
+      <nav class="datebar" aria-label="Choisir le jour">
+        <button id="prev" class="pill" type="button" aria-label="Jour précédent">←</button>
+        <div id="dlabel" class="label"></div>
+        <button id="next" class="pill" type="button" aria-label="Jour suivant">→</button>
+        <button id="pick" class="pill" type="button" aria-expanded="false" aria-controls="cal">Calendrier</button>
+        <button id="today" class="pill" type="button">Aujourd’hui</button>
+        <div id="cal" class="cal" hidden></div>
+      </nav>
+      <section id="summary" class="card summary"></section>
+      <section id="composer" class="card composer"></section>
+      <div id="meals" style="display:flex;flex-direction:column;gap:14px"></div>
+      <section id="acts" class="card meal act"></section>
+    </div>
+
+    <aside id="side" class="view" aria-label="Recettes et semaine">
+      <nav id="sideTabs" class="tabs" aria-label="Panneau"></nav>
+      <div id="paneRecipes" class="view"><div id="recipeList" style="display:flex;flex-direction:column;gap:14px"></div></div>
+      <div id="paneNew" class="view"><section id="recipeNew" class="card recipenew"></section></div>
+      <div id="paneWeek" class="view"><section id="week" class="card week"></section></div>
+      <div id="paneWeight" class="view"><section id="weightPane" class="card week"></section></div>
+    </aside>
+  </div>
+</div>
+<div id="gate" class="gate" role="dialog" aria-modal="true" aria-label="Choix du profil"><p class="muted">Chargement…</p></div>
+<div class="hint" style="text-align:center;margin:24px 0 8px">Version du 26/11 · 03h50</div>
+<div id="crop" class="cropwrap" hidden role="dialog" aria-modal="true" aria-label="Recadrer la photo"></div>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+(function(){
+"use strict";
+const MEALS=[
+  {id:"breakfast",label:"Petit-déjeuner"},
+  {id:"lunch",label:"Déjeuner"},
+  {id:"dinner",label:"Dîner"},
+  {id:"snack",label:"Collations"}
+];
+const DEFAULT_THEME={accent:null,tint:true,bg:null,mode:"auto",pattern:"none",radius:"md"};
+const DEFAULTS={goal:2000,protein:0,fibre:0,weight:0,addBack:true,theme:DEFAULT_THEME};
+const $=s=>document.querySelector(s);
+// replaceChildren écrit « null » pour une valeur nulle : on les écarte avant l'appel.
+(function(){
+  const rc=Element.prototype.replaceChildren;
+  Element.prototype.replaceChildren=function(...kids){return rc.apply(this,kids.flat(Infinity).filter(k=>k!=null&&k!==false));};
+})();
+function h(tag,props,...kids){
+  const e=document.createElement(tag);
+  for(const [k,v] of Object.entries(props||{})){
+    if(v==null||v===false) continue;
+    if(k==="class") e.className=v;
+    else if(k==="text") e.textContent=v;
+    else if(k==="value") e.value=v;
+    else if(k==="selected"||k==="checked"||k==="disabled"||k==="hidden"||k==="multiple") e[k]=!!v;
+    else if(k.startsWith("on")) e.addEventListener(k.slice(2),v);
+    else if(v===true) e.setAttribute(k,"");
+    else e.setAttribute(k,v);
+  }
+  for(const kid of kids.flat()){
+    if(kid==null||kid===false) continue;
+    e.append(kid.nodeType?kid:document.createTextNode(String(kid)));
+  }
+  return e;
+}
+const pad=n=>String(n).padStart(2,"0");
+const ds=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const parseD=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d);};
+const addDays=(s,n)=>{const d=parseD(s);d.setDate(d.getDate()+n);return ds(d);};
+const fmt=n=>Math.round(n||0).toLocaleString("fr-FR");
+const fmt1=n=>(Math.round((n||0)*10)/10).toLocaleString("fr-FR");
+const rnd=()=>Math.random().toString(36).slice(2,10);
+const uid8=()=>"e"+rnd();
+const newPid=()=>"p"+rnd().slice(0,6);
+const newRid=()=>"r"+rnd();
+const num=v=>{const n=parseFloat(String(v).replace(",","."));return isFinite(n)?n:0;};
+const plain=o=>JSON.parse(JSON.stringify(o));
+// Activités : heure de début "HH:MM", durée (min), pas, distance (km)
+function normTime(v){
+  const m=String(v==null?"":v).trim().toLowerCase().match(/^(\d{1,2})\s*(?:h|:)\s*(\d{0,2})$/);
+  if(!m) return "";
+  const hh=+m[1],mm=m[2]===""?0:+m[2];
+  return hh<24&&mm<60?String(hh).padStart(2,"0")+":"+String(mm).padStart(2,"0"):"";
+}
+const fmtDur=min=>{min=Math.round(min);return min>=60?Math.floor(min/60)+" h"+(min%60?" "+String(min%60).padStart(2,"0"):""):min+" min";};
+function actMeta(e){
+  return [e.at?"à "+e.at.replace(":","h"):"",e.min>0?fmtDur(e.min):"",e.steps>0?fmt(e.steps)+" pas":"",e.km>0?fmt1(e.km)+" km":""].filter(Boolean).join(" · ");
+}
+function actExtra(src){
+  const o={};
+  const at=normTime(src.at);if(at) o.at=at;
+  const t=String(src.type||"").trim().slice(0,30);if(t) o.type=t;
+  for(const k of ["min","steps","km"]){const v=num(src[k]);if(v>0) o[k]=k==="km"?Math.round(v*10)/10:Math.round(v);}
+  return o;
+}
+
+/* ---------- Modèle ---------- */
+const emptyDay=()=>({meals:{breakfast:[],lunch:[],dinner:[],snack:[]},acts:[],weight:null});
+function cleanDay(d){
+  if(!d) return emptyDay();
+  const meals={};
+  for(const m of MEALS) meals[m.id]=Array.isArray(d.meals&&d.meals[m.id])?d.meals[m.id]:[];
+  return {meals,acts:Array.isArray(d.acts)?d.acts:[],weight:typeof d.weight==="number"?d.weight:null};
+}
+function autoMeal(){const hr=new Date().getHours();return hr<10?"breakfast":hr<15?"lunch":hr<18?"snack":"dinner";}
+// Convention des colonnes : p protéines, c glucides hors fibres, fi fibres, f lipides (en grammes).
+const sum=(list,k)=>list.reduce((a,e)=>a+(Number(e[k])||0),0);
+
+const S={
+  date:ds(new Date()),
+  view:"journal",
+  side:"recipes",
+  profiles:[{id:"main",name:"Moi"}],
+  pid:"main",
+  data:{},            // pid -> {days:{}, settings:{}}
+  recipes:{},         // id -> recette
+  mode:"pending", uid:null, db:null, sample:null, limits:null,
+  editing:null, editDraft:null, undo:null, confirmDel:null
+};
+function pd(pid){const k=pid||S.pid;if(!S.data[k]) S.data[k]={days:{},settings:{...DEFAULTS}};return S.data[k];}
+const cfg=()=>{const s={...DEFAULTS,...pd().settings};s.theme={...DEFAULT_THEME,...(s.theme||{})};return s;};
+const getDay=date=>cleanDay(pd().days[date]);
+function totals(d){
+  let kcal=0,p=0,c=0,fi=0,f=0;
+  for(const m of MEALS){const l=d.meals[m.id];kcal+=sum(l,"kcal");p+=sum(l,"p");c+=sum(l,"c");fi+=sum(l,"fi");f+=sum(l,"f");}
+  return {kcal,p,c,fi,f,burned:sum(d.acts,"kcal")};
+}
+function recTotals(r){
+  const l=r.ingredients||[];
+  return {kcal:sum(l,"kcal"),p:sum(l,"p"),c:sum(l,"c"),fi:sum(l,"fi"),f:sum(l,"f")};
+}
+function perPortion(r){
+  const t=recTotals(r),n=Math.max(1,num(r.servings)||1);
+  return {kcal:t.kcal/n,p:t.p/n,c:t.c/n,fi:t.fi/n,f:t.f/n};
+}
+const macroLine=e=>"P "+fmt(e.p)+" · G "+fmt(e.c)+" · Fib "+fmt(e.fi)+" · L "+fmt(e.f);
+
+/* ---------- Stockage ---------- */
+const dayKey=(pid,date)=>pid==="main"?"day-"+date:"day-"+pid+"-"+date;
+const setKey=pid=>pid==="main"?"settings":"settings-"+pid;
+const reDay=/^day-(?:([a-z0-9]+)-)?(\d{4}-\d{2}-\d{2})$/;
+const reSet=/^settings(?:-([a-z0-9]+))?$/;
+const queues={};
+function enqueue(key,fn){
+  queues[key]=(queues[key]||Promise.resolve()).then(fn).catch(e=>{
+    setStatus("Sauvegarde impossible"+(e&&e.code?" ("+e.code+")":""),true);
+  });
+}
+const col=()=>S.db.collection("data/users/"+S.uid);
+function persistLocal(){
+  try{localStorage.setItem("journal-calories-v2",JSON.stringify({profiles:S.profiles,data:S.data,recipes:S.recipes}));}catch(e){}
+}
+function persistDay(pid,date){
+  if(S.mode==="db") enqueue(dayKey(pid,date),()=>col().doc(dayKey(pid,date)).set(plain(pd(pid).days[date])));
+  else persistLocal();
+}
+function persistSettings(pid){
+  if(S.mode==="db") enqueue(setKey(pid),()=>col().doc(setKey(pid)).set(plain(pd(pid).settings)));
+  else persistLocal();
+}
+function persistProfiles(){
+  if(S.mode==="db") enqueue("profiles",()=>col().doc("profiles").set({list:plain(S.profiles)}));
+  else persistLocal();
+}
+function persistRecipe(id){
+  if(S.mode==="db") enqueue("recipe-"+id,()=>col().doc("recipe-"+id).set(plain(S.recipes[id])));
+  else persistLocal();
+}
+function removeRecipeStore(id){
+  if(S.mode==="db") enqueue("recipe-"+id,()=>col().doc("recipe-"+id).delete());
+  else persistLocal();
+}
+function removeProfileStore(pid){
+  if(S.mode==="db"){
+    for(const date of Object.keys(pd(pid).days)) enqueue(dayKey(pid,date),()=>col().doc(dayKey(pid,date)).delete());
+    enqueue(setKey(pid),()=>col().doc(setKey(pid)).delete());
+  } else persistLocal();
+}
+function mutateDay(date,fn){
+  const pid=S.pid,d=cleanDay(pd(pid).days[date]);
+  fn(d);
+  pd(pid).days[date]=d;
+  renderAll();
+  persistDay(pid,date);
+}
+function setStatus(msg,bad){
+  const el=$("#status");
+  if(!msg){el.hidden=true;return;}
+  el.hidden=false;el.textContent=msg;el.className="chip"+(bad?" bad":"");
+}
+function toast(msg,actionLabel,action){
+  const t=$("#toast");
+  t.replaceChildren(h("span",{text:msg}));
+  if(actionLabel) t.append(h("button",{type:"button",text:actionLabel,onclick:()=>{action();t.hidden=true;}}));
+  t.hidden=false;
+  clearTimeout(toast._t);
+  toast._t=setTimeout(()=>{t.hidden=true;},actionLabel?6000:2500);
+}
+
+/* ---------- Photos (partagé entre Journal et Recettes) ---------- */
+// Décodage tolérant : essaie createImageBitmap, puis un décodage par <img> (réduit à 2048 px) en secours.
+async function loadBitmap(file){
+  for(const t of [()=>createImageBitmap(file,{imageOrientation:"from-image"}),()=>createImageBitmap(file)]){
+    try{return await t();}catch(e){}
+  }
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error("décodage impossible"));i.src=url;});
+    const w=img.naturalWidth,hh=img.naturalHeight;
+    if(!w||!hh) throw new Error("image vide");
+    const k=Math.min(1,2048/Math.max(w,hh)),cv=document.createElement("canvas");
+    cv.width=Math.max(1,Math.round(w*k));cv.height=Math.max(1,Math.round(hh*k));
+    cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+    return cv;
+  } finally{URL.revokeObjectURL(url);}
+}
+const fileInfo=f=>(f.type||"type inconnu")+", "+(Math.round(f.size/1e5)/10)+" Mo";
+// Bouton de choix de fichier : vrai bouton + champ fichier caché ouvert par le toucher (comportement d'origine).
+// Si rien ne s'ouvre (fenêtre qui bloque les fichiers, autorisations refusées), un message le dit au lieu de ne rien faire.
+function fileBtn(text,onFiles,o){
+  o=o||{};
+  let opened=false;
+  const mark=()=>{opened=true;};
+  const inp=h("input",{type:"file",accept:"image/*",hidden:true,"aria-label":text,
+    onchange:ev=>{mark();const fs=[...ev.target.files];ev.target.value="";if(fs.length) onFiles(fs);}});
+  if(o.multiple) inp.multiple=true;
+  if(o.capture) inp.setAttribute("capture",o.capture);
+  const btn=h("button",{type:"button",class:"btn"+(o.primary?" primary":"")+(o.small?" small":""),text,onclick:()=>{
+    opened=false;
+    const on=()=>mark();
+    window.addEventListener("blur",on,{once:true});document.addEventListener("visibilitychange",on,{once:true});
+    inp.click();
+    setTimeout(()=>{
+      window.removeEventListener("blur",on);document.removeEventListener("visibilitychange",on);
+      if(!opened) toast("Rien ne s’est ouvert : cette fenêtre bloque peut-être les fichiers. Vérifie les autorisations de l’appli Claude (Caméra, Photos) ou ouvre le journal dans Chrome.");
+    },1800);
+  }});
+  return h("span",{style:"display:contents"},btn,inp);
+}
+async function shrink(file){
+  try{
+    const bmp=await loadBitmap(file);
+    const k=Math.min(1,1600/Math.max(bmp.width,bmp.height));
+    const cv=document.createElement("canvas");
+    cv.width=Math.round(bmp.width*k);cv.height=Math.round(bmp.height*k);
+    cv.getContext("2d").drawImage(bmp,0,0,cv.width,cv.height);
+    const b=await new Promise(r=>cv.toBlob(r,"image/jpeg",0.88));
+    return b||file;
+  }catch(e){return file;}
+}
+function makePhotos(rerender){
+  const P={list:[]};
+  const onFiles=async files=>{
+    const max=(S.limits&&S.limits.images&&S.limits.images.maxCount)||4;
+    for(const f of files){
+      if(P.list.length>=max){toast("Maximum "+max+" photos par estimation.");break;}
+      const blob=await shrink(f);
+      P.list.push({blob,url:URL.createObjectURL(blob)});
+    }
+    rerender();
+  };
+  P.clear=()=>{P.list.forEach(p=>URL.revokeObjectURL(p.url));P.list.length=0;};
+  P.node=()=>h("div",{class:"photos"},
+    P.list.map((p,i)=>h("div",{class:"thumb"},h("img",{src:p.url,alt:"Photo "+(i+1)}),
+      h("button",{type:"button","aria-label":"Retirer la photo",text:"×",onclick:()=>{URL.revokeObjectURL(p.url);P.list.splice(i,1);rerender();}}))),
+    fileBtn("📷 Prendre une photo",onFiles,{capture:"environment"}),
+    fileBtn("🖼 Depuis la galerie",onFiles,{multiple:true}));
+  return P;
+}
+const ERR={
+  not_granted:"L’estimation par Claude n’est pas autorisée. Tu peux ajouter les lignes à la main.",
+  sampling_disabled:"L’estimation par Claude n’est pas disponible sur ce compte.",
+  rate_limited:"Trop de demandes ou limite d’usage atteinte. Réessaie un peu plus tard.",
+  image_rejected:"Une photo n’a pas pu être lue. Essaie un autre fichier (JPEG ou PNG).",
+  invalid_json:"La réponse était illisible. Relance l’estimation.",
+  session_expired:"Session expirée. Recharge la page.",
+  refused:"Cette demande n’a pas pu être traitée. Reformule la description."
+};
+const errText=e=>(e&&e.code==="cancelled")?"":(ERR[e&&e.code]||"L’estimation a échoué. Réessaie.");
+async function ask(prompt,photos,holder){
+  holder.ctl=new AbortController();
+  const opts={signal:holder.ctl.signal,cache:false};
+  if(photos.length) opts.images=photos.map(p=>p.blob);
+  try{return await S.sample.json(prompt,opts);}
+  finally{holder.ctl=null;}
+}
+
+/* ---------- Consignes communes aux prompts ---------- */
+const NUTRI_RULES=
+"- Colonnes en grammes : p = protéines, c = glucides HORS fibres, fi = fibres, f = lipides. kcal entier, cohérent avec 4×p + 4×c + 2×fi + 9×f (à 10 % près). Une décimale pour les grammes.\n"
++"- Respecte l'état indiqué (cuit, cru, égoutté) : les valeurs d'un aliment cuit à l'eau ne sont pas celles du cru. Appuie-toi sur des valeurs de table réalistes (Ciqual, USDA).\n"
++"- Repères : 1 c. à soupe d'huile ≈ 10 g ≈ 90 kcal ; 1 c. à café d'huile ≈ 4 g ≈ 35 kcal. Des oignons caramélisés = les oignons + la matière grasse et le sucre déclarés, rien d'autre.\n"
++"- ÉTIQUETTES NUTRITIONNELLES : si une photo montre un tableau de valeurs nutritionnelles ou un emballage, lis les valeurs (pour 100 g ou par portion selon la colonne) et applique-les à la quantité réellement concernée (donnée dans le texte, sinon la portion de l'étiquette ; dis lequel dans hypotheses). Les étiquettes américaines comptent les fibres dans les glucides totaux : retire-les de c. Si l'étiquette est floue ou coupée, dis-le et estime.\n"
++"- POIDS SUR PHOTO : pour un plat ou un aliment visible sans poids donné, estime les grammes avec des repères visibles (assiette standard ≈ 26 cm, fourchette ≈ 19 cm, cuillère à soupe, main, boîte, canette 33 cl, emballage de poids connu). Écris « ≈ 150 g » dans qty et mets approx à true. Un poids donné dans le texte prime toujours sur la photo.\n"
++"- Vise la valeur la plus probable, ni optimiste ni pessimiste. Sans quantité ni photo exploitable, suppose une portion standard et dis-le dans hypotheses.\n";
+function recipeCatalog(){
+  const list=Object.values(S.recipes).slice(0,80);
+  if(!list.length) return "";
+  return "\nRecettes enregistrées par la personne. Si la description s'y réfère (même approximativement, par exemple « ma soupe de courge »), ne recalcule pas : renvoie un item {\"recette_id\":\"<id>\",\"portions\":<nombre>} ou, si un poids est donné, {\"recette_id\":\"<id>\",\"grams\":<nombre>}.\n"
+    +list.map(r=>{const p=perPortion(r);return "- id="+r.id+" | « "+r.name+" » | "+r.servings+" portions"+(r.yieldG?" | poids total "+r.yieldG+" g":"")+" | par portion : "+fmt(p.kcal)+" kcal";}).join("\n")+"\n";
+}
+
+/* ---------- Journal : édition de lignes ---------- */
+function removeEntry(date,kind,mealId,id){
+  const pid=S.pid,before=plain(cleanDay(pd(pid).days[date]));
+  mutateDay(date,d=>{
+    if(kind==="act") d.acts=d.acts.filter(e=>e.id!==id);
+    else d.meals[mealId]=d.meals[mealId].filter(e=>e.id!==id);
+  });
+  S.undo={pid,date,data:before};
+  toast("Ligne supprimée","Annuler",()=>{const u=S.undo;pd(u.pid).days[u.date]=u.data;renderAll();persistDay(u.pid,u.date);});
+}
+function startEdit(kind,mealId,e){
+  S.editing=e.id;
+  S.editDraft={kind,meal:mealId,id:e.id,name:e.name||"",qty:e.qty||"",kcal:e.kcal||0,p:e.p||0,c:e.c||0,fi:e.fi||0,f:e.f||0,rid:e.rid||null,at:e.at||"",min:e.min||"",steps:e.steps||"",km:e.km||"",type:e.type||""};
+  renderAll();
+}
+function saveEdit(){
+  const dr=S.editDraft;if(!dr) return;
+  const e={id:dr.id,name:dr.name.trim()||"Sans nom",qty:dr.qty.trim(),kcal:Math.round(num(dr.kcal)),p:num(dr.p),c:num(dr.c),fi:num(dr.fi),f:num(dr.f)};
+  if(dr.rid) e.rid=dr.rid;
+  S.editing=null;S.editDraft=null;
+  mutateDay(S.date,d=>{
+    if(dr.kind==="act"){
+      const a={id:e.id,name:e.name,qty:e.qty,kcal:e.kcal,...actExtra(dr)};
+      const i=d.acts.findIndex(x=>x.id===e.id);
+      if(i>=0) d.acts[i]=a; else d.acts.push(a);
+    } else {
+      let from=null,idx=-1;
+      for(const m of MEALS){const i=d.meals[m.id].findIndex(x=>x.id===e.id);if(i>=0){from=m.id;idx=i;}}
+      if(from===dr.meal) d.meals[from][idx]=e;
+      else{ if(from) d.meals[from].splice(idx,1); d.meals[dr.meal].push(e); }
+    }
+  });
+}
+const closeEdit=()=>{S.editing=null;S.editDraft=null;};
+function addBlank(kind,mealId){startEdit(kind,mealId,{id:uid8(),name:"",qty:"",kcal:0,p:0,c:0,fi:0,f:0});}
+
+/* ---------- Journal : rendu ---------- */
+function renderDate(){
+  const d=parseD(S.date),isToday=S.date===ds(new Date());
+  $("#dlabel").replaceChildren(
+    d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}),
+    h("small",{text:isToday?"Aujourd’hui":d.getFullYear()}));
+  $("#today").classList.toggle("on",isToday);
+}
+function renderSummary(){
+  const d=getDay(S.date),t=totals(d),s=cfg();
+  const budget=s.goal+(s.addBack?t.burned:0),remaining=budget-t.kcal,over=remaining<0;
+  const pct=budget>0?Math.min(100,t.kcal/budget*100):0;
+  const saveW=()=>{const raw=wInput.value.trim(),v=raw===""?null:Math.round(num(raw)*10)/10;
+    if(v!==null&&(v<20||v>400)){toast("Poids invalide (entre 20 et 400 kg).");return;}
+    mutateDay(S.date,x=>{x.weight=v;});toast(v===null?"Poids effacé":"Poids enregistré : "+fmt1(v)+" kg");};
+  const wInput=h("input",{type:"number",inputmode:"decimal",step:"0.1",id:"dayWeight",value:d.weight==null?"":d.weight,placeholder:"kg",
+    onkeydown:ev=>{if(ev.key==="Enter"){ev.preventDefault();saveW();}}});
+  const macro=(label,val,goal)=>h("div",{class:"macro"},
+    h("small",{text:label}),
+    h("b",{class:"num",text:fmt(val)+" g"+(goal?" / "+fmt(goal):"")}),
+    goal?h("div",{class:"mini"},h("i",{style:"width:"+Math.min(100,val/goal*100)+"%"})):null);
+  $("#summary").replaceChildren(
+    h("div",{class:"big num"+(over?" over":"")},h("b",{text:fmt(Math.abs(remaining))}),h("span",{text:over?"kcal au-dessus du budget":"kcal restantes"})),
+    h("div",{class:"bar"+(over?" over":"")},h("i",{style:"width:"+pct+"%"})),
+    h("div",{class:"stats num"},
+      h("div",{class:"stat"},h("small",{text:"Objectif"}),h("b",{text:fmt(s.goal)})),
+      h("div",{class:"stat"},h("small",{text:"Mangé"}),h("b",{text:fmt(t.kcal)})),
+      h("div",{class:"stat"},h("small",{text:s.addBack?"Activité (ajoutée)":"Activité"}),h("b",{text:(s.addBack?"+":"")+fmt(t.burned)}))),
+    h("div",{class:"macros num"},macro("Protéines",t.p,s.protein),macro("Glucides",t.c),macro("Fibres",t.fi,s.fibre),macro("Lipides",t.f)),
+    h("div",{class:"weightrow"},h("label",{for:"dayWeight",text:"Poids du jour (facultatif)"}),wInput,h("button",{type:"button",class:"btn",text:"Enregistrer",onclick:saveW})));
+}
+function entryRow(kind,mealId,e){
+  if(S.editing===e.id) return editorFor(kind);
+  const hasM=kind==="meal"&&(e.p||e.c||e.fi||e.f);
+  return h("button",{type:"button",class:"entry",onclick:()=>startEdit(kind,mealId,e),"aria-label":"Modifier "+e.name},
+    h("span",{},h("span",{class:"n",text:e.name}),e.qty?h("span",{class:"q",text:e.qty}):null,
+      kind==="act"&&actMeta(e)?h("span",{class:"q",text:actMeta(e)}):null),
+    h("span",{class:"k num"},(kind==="act"&&!e.kcal?"—":fmt(e.kcal)+" kcal"),hasM?h("small",{text:macroLine(e)}):null));
+}
+function editorFor(kind){
+  const dr=S.editDraft;
+  const bind=key=>ev=>{dr[key]=ev.target.value;};
+  const f=(label,key,type,wide)=>h("label",{class:"f"+(wide?" wide":"")},label,
+    h("input",Object.assign({type:type||"text",value:dr[key],oninput:bind(key)},type==="number"?{inputmode:"decimal",step:"any"}:{})));
+  const nodes=[f("Nom","name","text",true),f(kind==="act"?"Durée / détail":"Quantité","qty","text",true),f("kcal","kcal","number")];
+  if(kind==="act") nodes.push(f("Heure (ex. 18h30)","at","text"),f("Durée (min)","min","number"),f("Pas","steps","number"),f("Distance (km)","km","number"));
+  if(kind==="meal"){
+    nodes.push(h("label",{class:"f"},"Repas",h("select",{onchange:bind("meal")},MEALS.map(m=>h("option",{value:m.id,selected:m.id===dr.meal,text:m.label})))));
+    nodes.push(f("Protéines (g)","p","number"),f("Glucides hors fibres (g)","c","number"),f("Fibres (g)","fi","number"),f("Lipides (g)","f","number"));
+  }
+  nodes.push(h("div",{class:"actions"},
+    h("button",{type:"button",class:"btn primary",text:"Enregistrer",onclick:saveEdit}),
+    h("button",{type:"button",class:"btn",text:"Annuler",onclick:()=>{closeEdit();renderAll();}}),
+    h("span",{class:"spacer"}),
+    h("button",{type:"button",class:"btn danger",text:"Supprimer",onclick:()=>{const id=dr.id,m=dr.meal,k=dr.kind;closeEdit();removeEntry(S.date,k,m,id);}})));
+  return h("div",{class:"editor"},nodes);
+}
+function renderMeals(){
+  const d=getDay(S.date);
+  $("#meals").replaceChildren(...MEALS.map(m=>{
+    const list=d.meals[m.id];
+    const editingHere=S.editDraft&&S.editDraft.kind==="meal"&&S.editDraft.meal===m.id&&!list.some(e=>e.id===S.editing);
+    return h("section",{class:"card meal"},
+      h("header",{},h("h3",{},m.label),h("b",{class:"num",text:fmt(sum(list,"kcal"))+" kcal"})),
+      list.length?list.map(e=>entryRow("meal",m.id,e)):(editingHere?null:h("div",{class:"empty",text:"Rien de saisi pour ce repas."})),
+      editingHere?editorFor("meal"):null,
+      h("button",{type:"button",class:"addline",text:"+ Ajouter une ligne à la main",onclick:()=>addBlank("meal",m.id)}));
+  }));
+}
+function renderActs(){
+  const d=getDay(S.date);
+  const editingHere=S.editDraft&&S.editDraft.kind==="act"&&!d.acts.some(e=>e.id===S.editing);
+  $("#acts").replaceChildren(
+    h("header",{},h("h3",{},"Activité"),h("b",{class:"num",text:"−"+fmt(sum(d.acts,"kcal"))+" kcal"})),
+    d.acts.length?d.acts.slice().sort((a,b)=>(a.at||"99:99").localeCompare(b.at||"99:99")).map(e=>entryRow("act",null,e)):(editingHere?null:h("div",{class:"empty",text:"Aucune activité saisie."})),
+    editingHere?editorFor("act"):null,
+    h("button",{type:"button",class:"addline",text:"+ Ajouter une activité à la main",onclick:()=>addBlank("act",null)}));
+}
+function weightSeries(pid){
+  const days=pd(pid).days;
+  return Object.keys(days).sort().map(d=>[d,days[d]&&days[d].weight]).filter(([d,w])=>typeof w==="number"&&w>0);
+}
+// Poids le plus récent connu à cette date (pesée du jour, sinon la précédente), puis réglage, puis dernière pesée
+function latestWeight(date){
+  const ser=weightSeries(),before=ser.filter(([d])=>d<=date);
+  if(before.length) return before[before.length-1][1];
+  if(cfg().weight>0) return cfg().weight;
+  return ser.length?ser[0][1]:0;
+}
+const WR={range:90};
+function renderWeightPane(){
+  const el=$("#weightPane");if(!el) return;
+  const all=weightSeries(),today=ds(new Date());
+  const ser=WR.range?all.filter(([d])=>d>=addDays(today,-WR.range)):all;
+  const ranges=[[30,"30 j"],[90,"3 mois"],[365,"1 an"],[0,"Tout"]];
+  const head=[h("h3",{},"Courbe du poids"),
+    h("div",{class:"seg",role:"group","aria-label":"Période"},ranges.map(([n,l])=>h("button",{type:"button",class:"pill"+(WR.range===n?" on":""),text:l,onclick:()=>{WR.range=n;renderWeightPane();}})))];
+  if(!ser.length){
+    el.replaceChildren(...head,h("p",{class:"muted",style:"margin-top:12px",text:all.length?"Aucune pesée sur cette période.":"Aucune pesée pour l’instant. Entre ton poids du jour dans le journal (sous le résumé) et touche Enregistrer."}));
+    return;
+  }
+  const W=340,H=190,L=40,R=12,T=14,B=26;
+  const vals=ser.map(x=>x[1]);let lo=Math.min(...vals),hi=Math.max(...vals);
+  if(hi-lo<1){const m=(hi+lo)/2;lo=m-.5;hi=m+.5;}
+  const padv=(hi-lo)*.15;lo-=padv;hi+=padv;
+  const t0=parseD(ser[0][0]).getTime(),t1=parseD(ser[ser.length-1][0]).getTime();
+  const X=d=>ser.length===1||t1===t0?(L+W-R)/2:L+(parseD(d).getTime()-t0)/(t1-t0)*(W-L-R);
+  const Y=v=>T+(hi-v)/(hi-lo)*(H-T-B);
+  const pts=ser.map(([d,v])=>[X(d),Y(v)]);
+  const shortD=d=>parseD(d).toLocaleDateString("fr-FR",{day:"numeric",month:"short"});
+  const ticks=[hi-padv,(hi+lo)/2,lo+padv];
+  const f1=n=>(Math.round(n*10)/10).toFixed(1).replace(".",",");
+  const svg='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Courbe du poids">'
+    +ticks.map(v=>'<line class="grid" x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'"/><text x="'+(L-6)+'" y="'+(Y(v)+4).toFixed(1)+'" text-anchor="end">'+f1(v)+'</text>').join("")
+    +(pts.length>1?'<polyline class="ln" points="'+pts.map(q=>q[0].toFixed(1)+","+q[1].toFixed(1)).join(" ")+'"/>':"")
+    +pts.map(q=>'<circle class="dot" cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="'+(pts.length>60?2:3.5)+'"/>').join("")
+    +'<text x="'+L+'" y="'+(H-6)+'" text-anchor="start">'+shortD(ser[0][0])+'</text>'
+    +(ser.length>1?'<text x="'+(W-R)+'" y="'+(H-6)+'" text-anchor="end">'+shortD(ser[ser.length-1][0])+'</text>':"")
+    +'</svg>';
+  const chart=h("div",{class:"wchart"});chart.innerHTML=svg;
+  const last=ser[ser.length-1],diff=ser.length>1?last[1]-ser[0][1]:0;
+  const sign=diff>0?"+":diff<0?"−":"";
+  el.replaceChildren(...head,chart,
+    h("p",{class:"muted num",style:"margin:6px 0 0;font-size:14px",text:"Dernier : "+f1(last[1])+" kg ("+shortD(last[0])+")"+(ser.length>1?" · Écart : "+sign+f1(Math.abs(diff))+" kg":"")+" · Min "+f1(Math.min(...vals))+" · Max "+f1(Math.max(...vals))}),
+    h("div",{class:"wlist"},ser.slice().reverse().slice(0,12).map(([d,v])=>
+      h("button",{type:"button",onclick:()=>{S.date=d;closeEdit();setView("journal");renderAll();}},
+        h("span",{text:parseD(d).toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"long"})}),h("b",{class:"num",text:f1(v)+" kg"})))));
+}
+function renderWeek(){
+  const dow=(parseD(S.date).getDay()+6)%7,monday=addDays(S.date,-dow);
+  const s=cfg(),goal=s.goal;
+  const info=[...Array(7)].map((_,i)=>{const date=addDays(monday,i),t=totals(getDay(date));return {date,kcal:t.kcal,burned:t.burned};});
+  const max=Math.max(goal*1.25,...info.map(i=>i.kcal),1);
+  const logged=info.filter(i=>i.kcal>0);
+  const avg=logged.length?sum(logged,"kcal")/logged.length:0;
+  const names=["L","M","M","J","V","S","D"];
+  $("#week").replaceChildren(
+    h("h3",{},"Cette semaine"),
+    h("div",{class:"bars"},
+      h("div",{class:"goal",style:"bottom:"+(goal/max*100)+"%"},h("span",{text:"objectif "+fmt(goal)})),
+      info.map(i=>h("button",{type:"button",class:"col"+(i.kcal>0?" has":"")+(i.kcal>goal+(s.addBack?i.burned:0)?" over":"")+(i.date===S.date?" sel":""),
+        "aria-label":parseD(i.date).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric"})+" : "+fmt(i.kcal)+" kcal",
+        onclick:()=>{S.date=i.date;closeEdit();renderAll();}},h("i",{style:"height:"+(i.kcal/max*100)+"%"})))),
+    h("div",{class:"labels num"},info.map((i,k)=>h("div",{},h("b",{text:names[k]}),i.kcal>0?fmt(i.kcal):"–"))),
+    h("p",{class:"muted",style:"margin:12px 0 0;font-size:14px",text:logged.length?"Moyenne sur les jours saisis : "+fmt(avg)+" kcal/jour.":"Aucun jour saisi cette semaine."}));
+}
+
+/* ---------- Journal : saisie ---------- */
+const C={kind:"meal",meal:autoMeal(),busy:false,ctl:null,draft:null,error:""};
+const ta=h("textarea",{id:"entryText",rows:"3"});
+const cPhotos=makePhotos(()=>renderComposer());
+function recents(){
+  const seen=new Set(),out=[];
+  const days=pd().days;
+  for(const date of Object.keys(days).sort().reverse()){
+    const d=cleanDay(days[date]);
+    const list=C.kind==="act"?d.acts:MEALS.flatMap(m=>d.meals[m.id]);
+    for(const e of list.slice().reverse()){
+      const key=(e.name||"").toLowerCase();
+      if(!key||seen.has(key)) continue;
+      seen.add(key);out.push(e);
+      if(out.length>=8) return out;
+    }
+  }
+  return out;
+}
+function addRecent(e){
+  const copy={...e,id:uid8()};
+  mutateDay(S.date,d=>{
+    if(C.kind==="act"){const x=actExtra(copy);delete x.at;d.acts.push({id:copy.id,name:copy.name,qty:copy.qty||"",kcal:copy.kcal,...x});}
+    else d.meals[C.meal].push(copy);
+  });
+  toast("Ajouté : "+copy.name);
+}
+function insertText(t){
+  ta.value=(ta.value.trim()?ta.value.trim()+(/[.,;]$/.test(ta.value.trim())?" ":", "):"")+t;
+  ta.focus();
+}
+function renderComposer(){
+  const mealLabel=MEALS.find(m=>m.id===C.meal).label;
+  ta.placeholder=C.kind==="act"
+    ?"Ex. marche, 13000 pas. Ou : 45 min de vélo à 18h, effort modéré. Ou : course de 7h30 à 8h15."
+    :"Ex. 120 g de potimarron cuit à l’eau, oignons caramélisés dans 1 c. à soupe d’huile. Tu peux aussi joindre une photo du plat ou de l’étiquette nutritionnelle.";
+  const recent=recents(),recs=Object.values(S.recipes);
+  $("#composer").replaceChildren(
+    h("h2",{},"Ajouter"),
+    h("div",{class:"seg",role:"group","aria-label":"Type de saisie"},
+      h("button",{type:"button",class:"pill"+(C.kind==="meal"?" on":""),text:"Repas",onclick:()=>{C.kind="meal";C.draft=null;renderComposer();}}),
+      h("button",{type:"button",class:"pill"+(C.kind==="act"?" on":""),text:"Activité",onclick:()=>{C.kind="act";C.draft=null;renderComposer();}})),
+    C.kind==="meal"?h("div",{class:"seg",role:"group","aria-label":"Repas"},MEALS.map(m=>
+      h("button",{type:"button",class:"pill"+(C.meal===m.id?" on":""),text:m.label,onclick:()=>{C.meal=m.id;renderComposer();}}))):null,
+    h("label",{class:"f",for:"entryText"},C.kind==="act"?"Décris ton activité":"Décris ce que tu as mangé"),
+    ta,
+    cPhotos.node(),
+    h("div",{class:"row",style:"margin-top:12px"},
+      C.busy
+        ?[h("button",{type:"button",class:"btn primary",disabled:true,text:"Estimation en cours…"}),
+          h("button",{type:"button",class:"btn",text:"Arrêter",onclick:()=>C.ctl&&C.ctl.abort()})]
+        :h("button",{type:"button",class:"btn primary",text:"Estimer",onclick:()=>estimate("")}),
+      h("span",{class:"muted",style:"font-size:13px",text:C.kind==="meal"?"Pour : "+mealLabel:""})),
+    C.error?h("div",{class:"err",role:"alert",text:C.error}):null,
+    C.kind==="meal"&&recs.length?h("div",{},
+      h("div",{class:"hint"},"Mes recettes (un clic ajoute une mention dans la description) :"),
+      h("div",{class:"recents"},recs.map(r=>h("button",{type:"button",class:"pill",text:r.name,onclick:()=>insertText("1 portion de "+r.name)})))):null,
+    recent.length?h("div",{},
+      h("div",{class:"hint"},"Déjà saisi récemment, un clic pour réajouter :"),
+      h("div",{class:"recents"},recent.map(e=>h("button",{type:"button",class:"pill",text:e.name+" · "+fmt(e.kcal),onclick:()=>addRecent(e)})))):null,
+    C.draft?renderDraft():null);
+}
+function renderDraft(){
+  const dr=C.draft;
+  const totalEl=h("span",{class:"num"}),macEl=h("div",{class:"tot2 num"});
+  const upd=()=>{
+    totalEl.textContent=fmt(sum(dr.items,"kcal"))+" kcal";
+    macEl.textContent=C.kind==="meal"?macroLine({p:sum(dr.items,"p"),c:sum(dr.items,"c"),fi:sum(dr.items,"fi"),f:sum(dr.items,"f")}):"";
+  };
+  const rows=dr.items.map((it,idx)=>h("div",{class:"item"},
+    h("input",{type:"text","aria-label":"Nom",value:it.name,oninput:ev=>{it.name=ev.target.value;}}),
+    h("input",{type:"number",inputmode:"numeric","aria-label":"kcal",value:it.kcal,oninput:ev=>{it.kcal=Math.round(num(ev.target.value));upd();}}),
+    h("button",{type:"button",class:"x","aria-label":"Retirer cette ligne",text:"×",onclick:()=>{dr.items.splice(idx,1);renderComposer();}}),
+    h("div",{class:"sub num",text:[it.qty,C.kind==="act"?actMeta(it):"",it.approx?"estimé sur photo":"",C.kind==="meal"&&(it.p||it.c||it.fi||it.f)?macroLine(it):""].filter(Boolean).join(" · ")})));
+  upd();
+  const corr=h("input",{type:"text",id:"corr",placeholder:"Ex. « c’était plutôt 2 cuillères d’huile » ou « l’assiette fait 200 g »",
+    onkeydown:ev=>{if(ev.key==="Enter"&&corr.value.trim()) estimate(corr.value.trim());}});
+  const target=C.kind==="act"?"l’activité":"« "+MEALS.find(m=>m.id===C.meal).label+" »";
+  return h("div",{class:"draft"},
+    h("h3",{},"Estimation",dr.confiance?h("span",{class:"chip",text:"confiance "+dr.confiance}):null),
+    rows,
+    h("div",{class:"total"},h("span",{text:"Total"}),totalEl),macEl,
+    dr.hypotheses.length?h("ul",{class:"hyp"},dr.hypotheses.map(x=>h("li",{text:x}))):null,
+    h("label",{class:"f",for:"corr"},"Préciser ou corriger"),
+    h("div",{class:"row"},corr,h("button",{type:"button",class:"btn",text:"Recalculer",disabled:C.busy,onclick:()=>{if(corr.value.trim()) estimate(corr.value.trim());}})),
+    h("div",{class:"row"},
+      h("button",{type:"button",class:"btn primary",disabled:!dr.items.length,text:"Ajouter à "+target,onclick:commitDraft}),
+      h("button",{type:"button",class:"btn",text:"Annuler",onclick:()=>{C.draft=null;renderComposer();}})));
+}
+function commitDraft(){
+  const items=C.draft.items.filter(i=>i.name.trim());
+  if(!items.length) return;
+  mutateDay(S.date,d=>{
+    for(const i of items){
+      if(C.kind==="act") d.acts.push({id:uid8(),name:i.name.trim(),qty:i.qty||"",kcal:i.kcal,...actExtra(i)});
+      else{
+        const e={id:uid8(),name:i.name.trim(),qty:i.qty||"",kcal:i.kcal,p:i.p,c:i.c,fi:i.fi,f:i.f};
+        if(i.rid) e.rid=i.rid;
+        d.meals[C.meal].push(e);
+      }
+    }
+  });
+  cPhotos.clear();C.draft=null;C.error="";ta.value="";
+  renderComposer();
+  toast("Ajouté au journal");
+}
+function buildPrompt(correction){
+  const text=ta.value.trim();
+  const photoLine=cPhotos.list.length?"Des photos sont jointes (plat, emballage ou étiquette nutritionnelle). Utilise-les avec la description.\n":"";
+  let p;
+  if(C.kind==="act"){
+    const lw=latestWeight(S.date),w=lw>0?fmt1(lw)+" kg":"inconnu (suppose 75 kg et dis-le dans hypotheses)";
+    p="Tu comprends et enregistres des activités physiques pour un journal, puis tu estimes les calories dépensées. Réponds uniquement avec un objet JSON, sans texte autour.\n\n"
+     +"Poids de la personne : "+w+".\nDescription : « "+(text||"(voir les photos)")+" »\n"+photoLine
+     +"\nRègles :\n- Comprends l'activité décrite : « marche » + « 13000 pas » = marche, 13 000 pas. Mets un nom clair dans name (Marche, Course à pied, Vélo, Natation, Musculation, Yoga, Ménage…) et une catégorie courte dans type.\n"
+     +"- Pas : renseigne steps. Sans distance donnée, km ≈ pas × 0,75 / 1000. Sans durée donnée, suppose environ 100 pas par minute et dis-le dans hypotheses.\n"
+     +"- Durée : « 45 min », « 1h30 », « 2 heures » → min (en minutes). Distance donnée → km.\n"
+     +"- Heure : si la personne indique quand (« à 18h », « de 7h30 à 8h15 », « ce matin à 9h »), mets l'heure de début dans at au format HH:MM (24 h) et déduis min si elle donne début et fin. Sinon at = null. N'invente jamais une heure.\n"
+     +"- Une ligne par activité distincte. Intensité non précisée : suppose un effort modéré et dis-le dans hypotheses.\n"
+     +"- kcal = calories actives, au-dessus du métabolisme de repos : (MET − 1) × poids × durée en heures. C'est secondaire : si tu ne peux pas estimer, mets 0.\n"
+     +"- Si une photo montre une montre ou une appli avec des calories, des pas ou une durée, utilise ces valeurs en le précisant.\n"
+     +"- qty = seulement un détail court (intensité, terrain : « rythme modéré »), SANS répéter durée, pas ni distance déjà dans leurs champs ; vide si rien à ajouter. Les champs inconnus valent null.\n"
+     +'\nFormat exact :\n{"items":[{"name":"Marche","type":"marche","qty":"rythme modéré","min":130,"steps":13000,"km":9.8,"at":"18:00","kcal":420}],"hypotheses":["..."],"confiance":"haute|moyenne|faible"}\n';
+  } else {
+    p="Tu estimes les calories et les macronutriments d'un repas pour un journal alimentaire. Réponds uniquement avec un objet JSON, sans texte autour.\n\n"
+     +"Repas : "+MEALS.find(m=>m.id===C.meal).label+".\nDescription : « "+(text||"(voir les photos)")+" »\n"+photoLine
+     +"\nRègles :\n- Une ligne par aliment ou ingrédient distinct (huile, sauce, pain, fromage... séparés).\n"+NUTRI_RULES
+     +'\nFormat exact (approx est facultatif) :\n{"items":[{"name":"Potimarron cuit à l\'eau","qty":"120 g","kcal":42,"p":1.3,"c":6.5,"fi":2.1,"f":0.2,"approx":false}],"hypotheses":["..."],"confiance":"haute|moyenne|faible"}\n'
+     +recipeCatalog();
+  }
+  if(correction&&C.draft){
+    p+="\nPremière estimation :\n"+JSON.stringify({items:C.draft.items.map(i=>({name:i.name,qty:i.qty,kcal:i.kcal,p:i.p,c:i.c,fi:i.fi,f:i.f})),hypotheses:C.draft.hypotheses})
+      +"\nCorrection de la personne : « "+correction+" ». Refais l'estimation complète en tenant compte de cette correction.\n";
+  }
+  return p;
+}
+function normItem(i,kind){
+  const base={name:String(i.name||"").slice(0,80),qty:String(i.qty||"").slice(0,60),kcal:Math.max(0,Math.round(num(i.kcal)))};
+  if(kind==="act") return {...base,...actExtra(i)};
+  const r=i.recette_id&&S.recipes[i.recette_id];
+  if(r){
+    const pp=perPortion(r);
+    let n=num(i.portions)>0?num(i.portions):1,qty;
+    if(num(i.grams)>0&&r.yieldG>0){n=num(i.grams)/(r.yieldG/Math.max(1,r.servings));qty=fmt(num(i.grams))+" g ("+fmt1(n)+" portion"+(n>1?"s":"")+")";}
+    else qty=fmt1(n)+" portion"+(n>1?"s":"");
+    return {name:r.name,qty,kcal:Math.round(pp.kcal*n),p:+(pp.p*n).toFixed(1),c:+(pp.c*n).toFixed(1),fi:+(pp.fi*n).toFixed(1),f:+(pp.f*n).toFixed(1),rid:r.id};
+  }
+  return {...base,p:num(i.p),c:num(i.c),fi:num(i.fi),f:num(i.f),approx:!!i.approx};
+}
+function normDraft(r,kind){
+  return {
+    items:(r&&Array.isArray(r.items)?r.items:[]).map(i=>normItem(i,kind)).filter(i=>i.name),
+    hypotheses:(r&&Array.isArray(r.hypotheses)?r.hypotheses:[]).map(String).slice(0,6),
+    confiance:r&&typeof r.confiance==="string"?r.confiance:""
+  };
+}
+async function estimate(correction){
+  if(C.busy) return;
+  if(!S.sample){C.busy=true;renderComposer();await loadSample();C.busy=false;if(!S.sample){C.error=NOSAMPLE;renderComposer();return;}}
+  if(!ta.value.trim()&&!cPhotos.list.length){C.error="Écris ce que tu as mangé ou ajoute une photo.";renderComposer();return;}
+  C.busy=true;C.error="";renderComposer();
+  try{
+    const draft=normDraft(await ask(buildPrompt(correction),cPhotos.list,C),C.kind);
+    if(!draft.items.length) C.error="Rien d’identifié. Ajoute des détails ou une photo.";
+    else C.draft=draft;
+  }catch(e){C.error=errText(e);}
+  finally{C.busy=false;renderComposer();}
+}
+
+/* ---------- Recettes ---------- */
+const R={busy:false,ctl:null,error:"",draft:null,openId:null,addId:null,add:{portions:1,meal:"lunch"},edit:null,confirmDel:null};
+const rName=h("input",{type:"text",id:"rName",placeholder:"Nom (facultatif, Claude en propose un)"});
+const rServ=h("input",{type:"number",id:"rServ",inputmode:"numeric",min:"1",placeholder:"Nb de portions (facultatif)"});
+const rText=h("textarea",{id:"rText",rows:"6",placeholder:"Ex. Soupe de courge : 1 kg de courge, 2 oignons, 1 c. à soupe d’huile d’olive, 1 litre de bouillon, 20 cl de crème. Faire revenir les oignons, ajouter la courge et le bouillon, cuire 25 min, mixer, ajouter la crème."});
+const rPhotos=makePhotos(()=>renderRecipeNew());
+function numField(label,obj,key,onChange){
+  return h("label",{class:"f"},label,h("input",{type:"number",inputmode:"decimal",step:"any",value:obj[key]||0,oninput:ev=>{obj[key]=num(ev.target.value);onChange();}}));
+}
+function ingEditor(rec,onChange,rerender){
+  return h("div",{},
+    rec.ingredients.map((it,idx)=>h("div",{class:"ing"},
+      h("input",{type:"text","aria-label":"Ingrédient",value:it.name,oninput:ev=>{it.name=ev.target.value;}}),
+      h("input",{type:"text","aria-label":"Quantité",value:it.qty,oninput:ev=>{it.qty=ev.target.value;}}),
+      h("button",{type:"button",class:"x","aria-label":"Retirer l’ingrédient",text:"×",onclick:()=>{rec.ingredients.splice(idx,1);onChange();rerender();}}),
+      h("div",{class:"mac"},numField("kcal",it,"kcal",onChange),numField("Prot. g",it,"p",onChange),numField("Gluc. g",it,"c",onChange),numField("Fib. g",it,"fi",onChange),numField("Lip. g",it,"f",onChange)))),
+    h("button",{type:"button",class:"addline",text:"+ Ingrédient",onclick:()=>{rec.ingredients.push({name:"",qty:"",kcal:0,p:0,c:0,fi:0,f:0});rerender();}}));
+}
+function recipeFields(rec,onChange){
+  return h("div",{class:"rhead"},
+    h("label",{class:"f wide"},"Nom",h("input",{type:"text",value:rec.name,oninput:ev=>{rec.name=ev.target.value;}})),
+    h("label",{class:"f"},"Portions",h("input",{type:"number",inputmode:"numeric",min:"1",value:rec.servings,oninput:ev=>{rec.servings=Math.max(1,Math.round(num(ev.target.value))||1);onChange();}})),
+    h("label",{class:"f"},"Poids total cuit (g)",h("input",{type:"number",inputmode:"numeric",value:rec.yieldG||"",oninput:ev=>{rec.yieldG=Math.round(num(ev.target.value));onChange();}})));
+}
+function stepsEditor(rec){
+  return h("label",{class:"f"},"Étapes (une par ligne)",
+    h("textarea",{rows:"4",oninput:ev=>{rec.steps=ev.target.value.split("\n").map(s=>s.trim()).filter(Boolean);}},rec.steps.join("\n")));
+}
+function ppLine(rec){const p=perPortion(rec);return "Par portion : "+fmt(p.kcal)+" kcal · "+macroLine(p);}
+function renderRecipeNew(){
+  const sec=$("#recipeNew");
+  sec.replaceChildren(
+    h("h2",{},"Nouvelle recette"),
+    h("div",{class:"rhead"},h("label",{class:"f wide"},"Nom",rName),h("label",{class:"f wide"},"Portions",rServ)),
+    h("label",{class:"f",for:"rText"},"Recette en texte (ingrédients avec quantités, étapes)"),
+    rText,
+    rPhotos.node(),
+    h("div",{class:"hint"},"Les photos peuvent montrer une page de livre ou les étiquettes nutritionnelles des produits utilisés."),
+    h("div",{class:"row",style:"margin-top:12px"},
+      R.busy
+        ?[h("button",{type:"button",class:"btn primary",disabled:true,text:"Calcul en cours…"}),h("button",{type:"button",class:"btn",text:"Arrêter",onclick:()=>R.ctl&&R.ctl.abort()})]
+        :h("button",{type:"button",class:"btn primary",text:"Créer la recette",onclick:()=>buildRecipe("")}),
+      null),
+    R.error?h("div",{class:"err",role:"alert",text:R.error}):null,
+    R.draft?renderRecipeDraft():null);
+}
+function renderRecipeDraft(){
+  const rec=R.draft,tot=h("div",{class:"total num"}),pp=h("div",{class:"tot2 num"});
+  const upd=()=>{const t=recTotals(rec);tot.replaceChildren(h("span",{text:"Total recette"}),h("span",{text:fmt(t.kcal)+" kcal"}));pp.textContent=ppLine(rec);};
+  upd();
+  const corr=h("input",{type:"text",id:"rcorr",placeholder:"Ex. « 20 cl de crème, pas 10 » ou « pour 6 portions »",
+    onkeydown:ev=>{if(ev.key==="Enter"&&corr.value.trim()) buildRecipe(corr.value.trim());}});
+  return h("div",{class:"draft"},
+    h("h3",{},"Recette calculée",rec.confiance?h("span",{class:"chip",text:"confiance "+rec.confiance}):null),
+    recipeFields(rec,upd),
+    ingEditor(rec,upd,renderRecipeNew),
+    tot,pp,
+    stepsEditor(rec),
+    rec.hypotheses.length?h("ul",{class:"hyp"},rec.hypotheses.map(x=>h("li",{text:x}))):null,
+    h("label",{class:"f",for:"rcorr"},"Préciser ou corriger"),
+    h("div",{class:"row"},corr,h("button",{type:"button",class:"btn",text:"Recalculer",disabled:R.busy,onclick:()=>{if(corr.value.trim()) buildRecipe(corr.value.trim());}})),
+    h("div",{class:"row"},
+      h("button",{type:"button",class:"btn primary",text:"Enregistrer la recette",onclick:saveRecipeDraft}),
+      h("button",{type:"button",class:"btn",text:"Annuler",onclick:()=>{R.draft=null;renderRecipeNew();}})));
+}
+function recipePrompt(correction){
+  let p="Tu transformes une recette écrite en recette structurée avec ses valeurs nutritionnelles. Réponds uniquement avec un objet JSON, sans texte autour.\n\n"
+   +"Nom donné : "+(rName.value.trim()||"(aucun, propose-en un court)")+"\nNombre de portions donné : "+(rServ.value.trim()||"(aucun, estime-le et dis-le dans hypotheses)")+"\n"
+   +"Texte : « "+(rText.value.trim()||"(voir les photos)")+" »\n"+(rPhotos.list.length?"Des photos sont jointes : page de recette, étiquettes nutritionnelles ou ingrédients. Utilise-les avec le texte.\n":"")
+   +"\nRègles :\n- Une ligne par ingrédient, avec la quantité TOTALE utilisée dans la recette (convertis cuillères et volumes en grammes quand c'est utile). Les valeurs sont celles de la quantité totale de l'ingrédient, pas par portion.\n"
+   +"- Compte la matière grasse de cuisson, les sauces et assaisonnements caloriques. Ignore sel, poivre, eau du robinet.\n"
+   +"- yieldG : estime le poids total de la préparation prête à manger, en grammes (après cuisson, pertes d'eau comprises).\n"
+   +"- steps : 3 à 8 étapes courtes, reformulées.\n"+NUTRI_RULES
+   +'\nFormat exact :\n{"name":"Soupe de courge","servings":4,"yieldG":1500,"ingredients":[{"name":"Courge","qty":"1 kg","kcal":260,"p":9,"c":50,"fi":12,"f":1}],"steps":["..."],"hypotheses":["..."],"confiance":"haute|moyenne|faible"}\n';
+  if(correction&&R.draft){
+    const d=R.draft;
+    p+="\nPremière version :\n"+JSON.stringify({name:d.name,servings:d.servings,yieldG:d.yieldG,ingredients:d.ingredients,steps:d.steps})
+      +"\nCorrection de la personne : « "+correction+" ». Refais la recette complète en tenant compte de cette correction.\n";
+  }
+  return p;
+}
+function normRecipe(r){
+  const ings=(r&&Array.isArray(r.ingredients)?r.ingredients:[]).map(i=>({
+    name:String(i.name||"").slice(0,80),qty:String(i.qty||"").slice(0,60),kcal:Math.max(0,Math.round(num(i.kcal))),
+    p:num(i.p),c:num(i.c),fi:num(i.fi),f:num(i.f)})).filter(i=>i.name);
+  return {
+    name:String(r&&r.name||rName.value||"Recette").slice(0,80),
+    servings:Math.max(1,Math.round(num(r&&r.servings)||num(rServ.value))||1),
+    yieldG:Math.max(0,Math.round(num(r&&r.yieldG))),
+    ingredients:ings,
+    steps:(r&&Array.isArray(r.steps)?r.steps:[]).map(String).slice(0,12),
+    hypotheses:(r&&Array.isArray(r.hypotheses)?r.hypotheses:[]).map(String).slice(0,6),
+    confiance:r&&typeof r.confiance==="string"?r.confiance:""
+  };
+}
+async function buildRecipe(correction){
+  if(R.busy) return;
+  if(!S.sample){R.busy=true;renderRecipeNew();await loadSample();R.busy=false;if(!S.sample){R.error=NOSAMPLE;renderRecipeNew();return;}}
+  if(!rText.value.trim()&&!rPhotos.list.length&&!(correction&&R.draft)){R.error="Écris la recette ou ajoute une photo.";renderRecipeNew();return;}
+  R.busy=true;R.error="";renderRecipeNew();
+  try{
+    const rec=normRecipe(await ask(recipePrompt(correction),rPhotos.list,R));
+    if(!rec.ingredients.length) R.error="Aucun ingrédient identifié. Ajoute des quantités ou une photo.";
+    else R.draft=rec;
+  }catch(e){R.error=errText(e);}
+  finally{R.busy=false;renderRecipeNew();}
+}
+function saveRecipeDraft(){
+  const d=R.draft;
+  const rec={id:newRid(),name:d.name.trim()||"Recette",servings:d.servings,yieldG:d.yieldG,
+    ingredients:d.ingredients.filter(i=>i.name.trim()),steps:d.steps,created:Date.now()};
+  S.recipes[rec.id]=rec;persistRecipe(rec.id);
+  R.draft=null;R.openId=rec.id;
+  rName.value="";rServ.value="";rText.value="";rPhotos.clear();
+  renderRecipeNew();renderRecipeList();renderComposer();
+  toast("Recette enregistrée");
+}
+function addRecipeToLog(rec){
+  const n=Math.max(0.1,num(R.add.portions)||1),pp=perPortion(rec),meal=R.add.meal;
+  mutateDay(S.date,d=>{d.meals[meal].push({id:uid8(),name:rec.name,qty:fmt1(n)+" portion"+(n>1?"s":""),
+    kcal:Math.round(pp.kcal*n),p:+(pp.p*n).toFixed(1),c:+(pp.c*n).toFixed(1),fi:+(pp.fi*n).toFixed(1),f:+(pp.f*n).toFixed(1),rid:rec.id});});
+  R.addId=null;
+  renderRecipeList();
+  toast("Ajouté à « "+MEALS.find(m=>m.id===meal).label+" » du "+parseD(S.date).toLocaleDateString("fr-FR",{day:"numeric",month:"long"}));
+}
+function renderRecipeList(){
+  const list=Object.values(S.recipes).sort((a,b)=>(b.created||0)-(a.created||0));
+  const box=$("#recipeList");
+  if(!list.length){box.replaceChildren(h("div",{class:"card muted",text:"Aucune recette enregistrée. Décris-en une ci-dessus, elle restera disponible dans le journal et pour tous les profils."}));return;}
+  box.replaceChildren(...list.map(rec=>{
+    if(R.edit&&R.edit.id===rec.id) return renderRecipeEdit();
+    const open=R.openId===rec.id,pp=perPortion(rec);
+    const card=h("section",{class:"card rcard"},
+      h("h3",{text:rec.name}),
+      h("div",{class:"line num",text:rec.servings+" portion"+(rec.servings>1?"s":"")+(rec.yieldG?" · "+fmt(rec.yieldG)+" g au total":"")}),
+      h("div",{class:"line num",text:fmt(pp.kcal)+" kcal par portion · "+macroLine(pp)}),
+      h("div",{class:"acts"},
+        h("button",{type:"button",class:"btn primary small",text:"Ajouter au journal",onclick:()=>{R.addId=R.addId===rec.id?null:rec.id;R.add={portions:1,meal:C.meal};renderRecipeList();}}),
+        h("button",{type:"button",class:"btn small",text:open?"Masquer":"Détails",onclick:()=>{R.openId=open?null:rec.id;renderRecipeList();}}),
+        h("button",{type:"button",class:"btn small",text:"Modifier",onclick:()=>{R.edit=plain(rec);R.edit.steps=R.edit.steps||[];renderRecipeList();}})));
+    if(R.addId===rec.id){
+      card.append(h("div",{class:"addbox"},
+        h("label",{class:"f"},"Portions",h("input",{type:"number",inputmode:"decimal",step:"0.25",value:R.add.portions,oninput:ev=>{R.add.portions=ev.target.value;}})),
+        h("label",{class:"f"},"Repas",h("select",{onchange:ev=>{R.add.meal=ev.target.value;}},MEALS.map(m=>h("option",{value:m.id,selected:m.id===R.add.meal,text:m.label})))),
+        h("button",{type:"button",class:"btn primary",text:"Ajouter au "+parseD(S.date).toLocaleDateString("fr-FR",{day:"numeric",month:"short"}),onclick:()=>addRecipeToLog(rec)})));
+    }
+    if(open){
+      card.append(
+        h("ul",{},rec.ingredients.map(i=>h("li",{text:i.name+(i.qty?" : "+i.qty:"")+" · "+fmt(i.kcal)+" kcal"}))),
+        rec.steps&&rec.steps.length?h("ol",{},rec.steps.map(s=>h("li",{text:s}))):null);
+    }
+    return card;
+  }));
+}
+function renderRecipeEdit(){
+  const rec=R.edit,tot=h("div",{class:"tot2 num"});
+  const upd=()=>{tot.textContent=fmt(recTotals(rec).kcal)+" kcal au total · "+ppLine(rec);};
+  upd();
+  const del=R.confirmDel===rec.id;
+  return h("section",{class:"card rcard"},
+    h("h3",{text:"Modifier la recette"}),
+    recipeFields(rec,upd),
+    ingEditor(rec,upd,renderRecipeList),
+    tot,stepsEditor(rec),
+    h("div",{class:"acts"},
+      h("button",{type:"button",class:"btn primary",text:"Enregistrer",onclick:()=>{
+        const out={...rec,name:rec.name.trim()||"Recette",ingredients:rec.ingredients.filter(i=>i.name.trim())};
+        S.recipes[out.id]=out;persistRecipe(out.id);R.edit=null;renderRecipeList();renderComposer();}}),
+      h("button",{type:"button",class:"btn",text:"Annuler",onclick:()=>{R.edit=null;R.confirmDel=null;renderRecipeList();}}),
+      h("span",{class:"spacer"}),
+      h("button",{type:"button",class:"btn danger",text:del?"Confirmer la suppression":"Supprimer",onclick:()=>{
+        if(!del){R.confirmDel=rec.id;renderRecipeList();return;}
+        delete S.recipes[rec.id];removeRecipeStore(rec.id);R.edit=null;R.confirmDel=null;R.openId=null;renderRecipeList();renderComposer();
+        toast("Recette supprimée (les repas déjà notés ne changent pas)");}})));
+}
+
+
+/* ---------- Apparence ---------- */
+const PRESETS=[
+  {id:"vert",n:"Vert",l:"#0d7a58",d:"#3fcf9f"},{id:"bleu",n:"Bleu",l:"#2461a8",d:"#7db2ee"},
+  {id:"violet",n:"Violet",l:"#6d3fc0",d:"#b79bf2"},{id:"rose",n:"Rose",l:"#c2336f",d:"#f08bb4"},
+  {id:"orange",n:"Orange",l:"#c2570c",d:"#f2a65a"},{id:"rouge",n:"Rouge",l:"#c03030",d:"#f28b8b"},
+  {id:"turquoise",n:"Turquoise",l:"#0b7f8f",d:"#5cd0df"},{id:"ardoise",n:"Ardoise",l:"#3f4f63",d:"#a9bad0"},
+  {id:"kaki",n:"Kaki",l:"#5f6f2e",d:"#b4c56a"},{id:"marron",n:"Marron",l:"#8a5a2b",d:"#d8a46b"}];
+const PALETTE={
+  light:{"--bg":"#f2f5f0","--surface":"#ffffff","--ink":"#14211a","--muted":"#5b6b62","--line":"#dde4dd","--warn":"#b3540a","--act":"#2461a8"},
+  dark:{"--bg":"#0e1612","--surface":"#16211b","--ink":"#e6efe9","--muted":"#97a89d","--line":"#26362d","--warn":"#f0a24c","--act":"#7db2ee"}};
+const HEX=/^#[0-9a-f]{6}$/i;
+const IMG_RE=/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/;
+const BLOB_RE=/^\/_blob\/[0-9a-f]{16,64}$/;
+const IMG_OK=v=>IMG_RE.test(v||"")||BLOB_RE.test(v||"");
+const PATTERNS=[["none","Aucun"],["flowers","Fleurs"],["leaves","Feuilles"],["stars","Étoiles"],["waves","Vagues"],["hearts","Cœurs"],["bubbles","Bulles"],["dots","Points"],["grid","Grille"],["lines","Lignes"],["diag","Diagonales"],["check","Damier"]];
+const RADII={sm:["4px","3px"],md:["14px","10px"],lg:["22px","16px"]};
+const darkMq=window.matchMedia?window.matchMedia("(prefers-color-scheme: dark)"):{matches:false};
+function isDarkNow(mode){
+  if(mode==="dark") return true;
+  if(mode==="light") return false;
+  const t=document.documentElement.getAttribute("data-theme");
+  return t==="dark"||(t!=="light"&&darkMq.matches);
+}
+function lumOf(hex){
+  const m=/^#?([0-9a-f]{6})$/i.exec(hex||"");if(!m) return 0;
+  const n=parseInt(m[1],16),ch=[n>>16,(n>>8)&255,n&255].map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);});
+  return 0.2126*ch[0]+0.7152*ch[1]+0.0722*ch[2];
+}
+function flowerSvg(cx,cy,k){
+  let g="";for(let i=0;i<5;i++) g+="<ellipse cx='0' cy='-"+(5*k)+"' rx='"+(3.2*k)+"' ry='"+(5*k)+"' transform='rotate("+(i*72)+")'/>";
+  return "<g transform='translate("+cx+" "+cy+")'>"+g+"<circle r='"+(2.4*k)+"' fill-opacity='.55'/></g>";
+}
+const SVG_PATTERNS={
+  flowers:{w:72,h:72,body:()=>flowerSvg(18,18,1)+flowerSvg(54,52,.75)},
+  leaves:{w:64,h:64,body:()=>"<path transform='translate(10 24) rotate(-35)' d='M0 0C6 -7 15 -7 20 0C15 7 6 7 0 0Z'/><path transform='translate(40 54) rotate(25)' d='M0 0C5 -6 12 -6 16 0C12 6 5 6 0 0Z'/><circle cx='50' cy='14' r='2'/>"},
+  stars:{w:56,h:56,body:()=>"<path transform='translate(14 14)' d='M0 -7L1.8 -1.8L7 0L1.8 1.8L0 7L-1.8 1.8L-7 0L-1.8 -1.8Z'/><path transform='translate(42 40) scale(.7)' d='M0 -7L1.8 -1.8L7 0L1.8 1.8L0 7L-1.8 1.8L-7 0L-1.8 -1.8Z'/><circle cx='42' cy='12' r='1.5'/>"},
+  waves:{w:64,h:28,stroke:true,body:()=>"<path d='M0 14Q8 6 16 14T32 14T48 14T64 14' fill='none' stroke-width='1.6'/>"},
+  hearts:{w:60,h:60,body:()=>"<path transform='translate(16 18)' d='M0 7C-9 -1 -9 -9 -4 -9C-1.8 -9 0 -7.4 0 -5.6C0 -7.4 1.8 -9 4 -9C9 -9 9 -1 0 7Z'/><path transform='translate(44 46) scale(.7)' d='M0 7C-9 -1 -9 -9 -4 -9C-1.8 -9 0 -7.4 0 -5.6C0 -7.4 1.8 -9 4 -9C9 -9 9 -1 0 7Z'/>"},
+  bubbles:{w:70,h:70,stroke:true,body:()=>"<circle cx='16' cy='18' r='9' fill='none' stroke-width='1.5'/><circle cx='48' cy='14' r='4' fill='none' stroke-width='1.5'/><circle cx='52' cy='50' r='11' fill='none' stroke-width='1.5'/><circle cx='18' cy='52' r='5' fill='none' stroke-width='1.5'/>"}
+};
+/* Motif sur mesure : Claude renvoie une liste de formes simples, validées puis redessinées ici (jamais de SVG brut). */
+const MOTIF_T=["circle","ellipse","rect","path","polygon","line"];
+function cleanMotif(m){
+  if(!m||typeof m!=="object"||!Array.isArray(m.shapes)) return null;
+  const tile=Math.min(120,Math.max(40,Math.round(num(m.tile))||64));
+  const cl=v=>Math.round(Math.min(tile+20,Math.max(-20,num(v)))*10)/10;
+  const col=v=>HEX.test(v||"")?v.toLowerCase():null;
+  const shapes=[];
+  for(const x of m.shapes.slice(0,48)){
+    if(!x||!MOTIF_T.includes(x.t)) continue;
+    const o={t:x.t,fill:x.fill==="none"?"none":(col(x.fill)||(x.stroke?"none":"#ffffff")),stroke:col(x.stroke),sw:Math.min(6,Math.max(0,num(x.sw)||0)),o:Math.min(1,Math.max(.1,num(x.o)||1))};
+    if(x.t==="circle"){o.cx=cl(x.cx);o.cy=cl(x.cy);o.r=Math.min(tile,Math.max(.5,num(x.r)));}
+    else if(x.t==="ellipse"){o.cx=cl(x.cx);o.cy=cl(x.cy);o.rx=Math.min(tile,Math.max(.5,num(x.rx)));o.ry=Math.min(tile,Math.max(.5,num(x.ry)));}
+    else if(x.t==="rect"){o.x=cl(x.x);o.y=cl(x.y);o.w=Math.min(tile,Math.max(.5,num(x.w)));o.h=Math.min(tile,Math.max(.5,num(x.h)));o.rx=Math.min(tile,Math.max(0,num(x.rx)));}
+    else if(x.t==="line"){o.x1=cl(x.x1);o.y1=cl(x.y1);o.x2=cl(x.x2);o.y2=cl(x.y2);if(!o.stroke) continue;}
+    else if(x.t==="path"){if(!/^[MmLlHhVvCcSsQqTtAaZz0-9eE+\-.,\s]{1,500}$/.test(x.d||"")) continue;o.d=x.d;}
+    else if(x.t==="polygon"){if(!/^[0-9.,\s-]{1,240}$/.test(x.points||"")) continue;o.points=x.points;}
+    shapes.push(o);
+  }
+  return shapes.length?{tile,shapes,name:String(m.name||"").slice(0,40)}:null;
+}
+function motifUrl(m){
+  const a=(k,v)=>" "+k+"='"+String(v).replace(/[^0-9a-zA-Z#.,\s+\-]/g,"")+"'";
+  const body=m.shapes.map(o=>{
+    const common=a("fill",o.fill)+(o.stroke?a("stroke",o.stroke)+a("stroke-width",o.sw||1)+a("stroke-linecap","round")+a("stroke-linejoin","round"):"")+(o.o<1?a("opacity",o.o):"");
+    const geo={circle:()=>a("cx",o.cx)+a("cy",o.cy)+a("r",o.r),ellipse:()=>a("cx",o.cx)+a("cy",o.cy)+a("rx",o.rx)+a("ry",o.ry),
+      rect:()=>a("x",o.x)+a("y",o.y)+a("width",o.w)+a("height",o.h)+a("rx",o.rx),line:()=>a("x1",o.x1)+a("y1",o.y1)+a("x2",o.x2)+a("y2",o.y2),
+      path:()=>a("d",o.d),polygon:()=>a("points",o.points)}[o.t]();
+    return "<"+o.t+geo+common+"/>";
+  }).join("");
+  const svg="<svg xmlns='http://www.w3.org/2000/svg' width='"+m.tile+"' height='"+m.tile+"' viewBox='0 0 "+m.tile+" "+m.tile+"'><g opacity='.65'>"+body+"</g></svg>";
+  return ['url("data:image/svg+xml,'+encodeURIComponent(svg)+'")',Math.round(m.tile*1.5)+"px "+Math.round(m.tile*1.5)+"px"];
+}
+function svgPattern(id,color,alpha){
+  const d=SVG_PATTERNS[id];
+  const attrs=d.stroke?"stroke='"+color+"' stroke-opacity='"+alpha+"'":"fill='"+color+"' fill-opacity='"+alpha+"'";
+  const svg="<svg xmlns='http://www.w3.org/2000/svg' width='"+d.w+"' height='"+d.h+"'><g "+attrs+">"+d.body()+"</g></svg>";
+  return ['url("data:image/svg+xml,'+encodeURIComponent(svg)+'")',d.w+"px "+d.h+"px"];
+}
+function inkFor(hex){
+  const m=/^#?([0-9a-f]{6})$/i.exec(hex||"");if(!m) return "#ffffff";
+  const n=parseInt(m[1],16),ch=[n>>16,(n>>8)&255,n&255].map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);});
+  return (0.2126*ch[0]+0.7152*ch[1]+0.0722*ch[2])>0.4?"#0b140f":"#ffffff";
+}
+function resolveAccent(th,dark){
+  if(!th.accent) return null;
+  if(th.accent.indexOf("preset:")===0){const p=PRESETS.find(x=>"preset:"+x.id===th.accent);return p?(dark?p.d:p.l):null;}
+  return /^#[0-9a-f]{6}$/i.test(th.accent)?th.accent:null;
+}
+const VARS=["--blur","--bg","--surface","--ink","--muted","--line","--warn","--act","--accent","--accent-ink","--soft","--r","--r2"];
+function hslOf(hex){
+  const m=/^#?([0-9a-f]{6})$/i.exec(hex||"");if(!m) return [150,60,30];
+  const n=parseInt(m[1],16),r=(n>>16)/255,g=((n>>8)&255)/255,bl=(n&255)/255;
+  const mx=Math.max(r,g,bl),mn=Math.min(r,g,bl),l=(mx+mn)/2,d=mx-mn;
+  let hh=0,ss=0;
+  if(d){
+    ss=d/(1-Math.abs(2*l-1));
+    hh=mx===r?((g-bl)/d)%6:mx===g?(bl-r)/d+2:(r-g)/d+4;
+    hh=(hh*60+360)%360;
+  }
+  return [hh,ss*100,l*100];
+}
+// Neutres (fond, cartes, textes, traits) qui reprennent la teinte de la couleur choisie.
+function derivePalette(h,s,dark){
+  const sat=Math.round(Math.min(34,s*0.4)+6),H=Math.round(h);
+  const c=(sa,l)=>"hsl("+H+" "+sa+"% "+l+"%)";
+  return dark
+    ?{"--bg":c(sat,8),"--surface":c(sat,12),"--ink":c(Math.min(sat,25),92),"--muted":c(Math.round(sat*.6),66),"--line":c(sat,21)}
+    :{"--bg":c(sat,95),"--surface":c(Math.min(sat,40),99),"--ink":c(Math.min(sat+8,40),11),"--muted":c(Math.round(sat*.6),38),"--line":c(sat,87)};
+}
+function applyTheme(live){
+  const th={...DEFAULT_THEME,...(live||cfg().theme)},root=document.documentElement,dark=isDarkNow(th.mode);
+  VARS.forEach(v=>root.style.removeProperty(v));
+  root.style.removeProperty("color-scheme");
+  const acc=resolveAccent(th,dark);
+  const tint=th.tint!==false&&!!acc;
+  if(th.mode!=="auto"||tint){
+    const base={...PALETTE[dark?"dark":"light"]};
+    if(tint){const hs=hslOf(acc);Object.assign(base,derivePalette(hs[0],hs[1],dark));}
+    Object.entries(base).forEach(([k,v])=>root.style.setProperty(k,v));
+    root.style.setProperty("color-scheme",dark?"dark":"light");
+    if(!acc){
+      root.style.setProperty("--accent",dark?"#3fcf9f":"#0d7a58");root.style.setProperty("--accent-ink",dark?"#06130d":"#ffffff");
+      root.style.setProperty("--soft",dark?"#1c2a22":"#e6efe8");
+    }
+  }
+  if(th.bg&&/^#[0-9a-f]{6}$/i.test(th.bg)){const L=lumOf(th.bg);if(dark?L<0.15:L>0.6) root.style.setProperty("--bg",th.bg);}
+  if(acc){
+    root.style.setProperty("--accent",acc);root.style.setProperty("--accent-ink",inkFor(acc));
+    root.style.setProperty("--soft","color-mix(in srgb, "+acc+" 13%, var(--surface))");
+  }
+  const r=RADII[th.radius]||RADII.md;
+  root.style.setProperty("--r",r[0]);root.style.setProperty("--r2",r[1]);
+  const co=th.cardOpacity==null?100:Math.round(Math.min(100,Math.max(30,num(th.cardOpacity))));
+  if(co<100){
+    const sf=getComputedStyle(root).getPropertyValue("--surface").trim();
+    if(sf) root.style.setProperty("--surface","color-mix(in srgb, "+sf+" "+co+"%, transparent)");
+    root.style.setProperty("--blur",co<=85?"6px":"0px");
+  }
+  const b=document.body.style,pat="var(--pat)";
+  const defs={
+    none:["none","auto"],
+    dots:["radial-gradient(circle, "+pat+" 1.3px, transparent 1.8px)","18px 18px"],
+    grid:["linear-gradient("+pat+" 1px, transparent 1px), linear-gradient(90deg, "+pat+" 1px, transparent 1px)","26px 26px"],
+    lines:["repeating-linear-gradient(0deg, "+pat+" 0 1px, transparent 1px 24px)","auto"],
+    diag:["repeating-linear-gradient(45deg, "+pat+" 0 1px, transparent 1px 16px)","auto"],
+    check:["conic-gradient("+pat+" 25%, transparent 0 50%, "+pat+" 0 75%, transparent 0)","32px 32px"]};
+  let d=defs[th.pattern]||defs.none;
+  const cm=th.pattern==="custom"?cleanMotif(th.motif):null;
+  if(cm) d=motifUrl(cm);
+  else if(SVG_PATTERNS[th.pattern]) d=svgPattern(th.pattern,acc||(dark?"#3fcf9f":"#0d7a58"),dark?0.2:0.17);
+  b.backgroundRepeat="";b.backgroundPosition="";b.backgroundAttachment="";
+  if(th.pattern==="image"&&IMG_OK(th.image)){
+    const v=Math.round(Math.min(90,Math.max(0,th.veil==null?35:num(th.veil))));
+    const veil="color-mix(in srgb, var(--bg) "+v+"%, transparent)";
+    b.backgroundImage="linear-gradient("+veil+","+veil+"), url(\""+th.image+"\")";
+    b.backgroundSize="cover";b.backgroundPosition="center";b.backgroundAttachment="fixed";b.backgroundRepeat="no-repeat";
+    return;
+  }
+  b.backgroundImage=d[0];b.backgroundSize=d[1];
+}
+function setTheme(patch){
+  pd().settings={...cfg(),theme:{...cfg().theme,...patch}};
+  persistSettings(S.pid);applyTheme();renderSettings();
+}
+if(darkMq.addEventListener) darkMq.addEventListener("change",()=>applyTheme());
+try{new MutationObserver(()=>applyTheme()).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});}catch(e){}
+
+/* ---------- Image de fond choisie dans la galerie ---------- */
+async function pickBackground(file){
+  try{
+    toast("Image reçue (" + fileInfo(file) + "), traitement…");
+    const bmp=await loadBitmap(file);
+    let url="";
+    for(const [max,q] of [[1280,.72],[1100,.65],[900,.6],[720,.55],[600,.5]]){
+      const k=Math.min(1,max/Math.max(bmp.width,bmp.height)),cv=document.createElement("canvas");
+      cv.width=Math.max(1,Math.round(bmp.width*k));cv.height=Math.max(1,Math.round(bmp.height*k));
+      cv.getContext("2d").drawImage(bmp,0,0,cv.width,cv.height);
+      url=cv.toDataURL("image/jpeg",q);
+      if(url.length<=280000) break;
+    }
+    if(!IMG_RE.test(url)||url.length>400000) throw new Error("trop lourde");
+    const prev=plain(cfg().theme);
+    setTheme({image:url,pattern:"image"});
+    toast("Image appliquée","Annuler",()=>setTheme(prev));
+  }catch(e){toast("Impossible de lire cette image ("+fileInfo(file)+"). Essaie un JPEG ou une capture d’écran.");}
+}
+
+/* ---------- Apparence décrite en une phrase ---------- */
+const A={busy:false,error:"",note:"",prev:null};
+const aiIn=h("input",{type:"text",id:"aiTheme",maxlength:"160",placeholder:"Ex. jardin fleuri rose pastel, ou nuit bleue minimaliste",
+  onkeydown:ev=>{if(ev.key==="Enter") themeFromPrompt();}});
+function cleanAI(r){
+  if(!r||typeof r!=="object") return null;
+  const t={};
+  t.mode=r.mode==="dark"?"dark":"light";
+  t.accent=HEX.test(r.accent||"")&&(t.mode==="dark"?lumOf(r.accent)>0.1:lumOf(r.accent)<0.55)?r.accent.toLowerCase():null;
+  const L=HEX.test(r.bg||"")?lumOf(r.bg):-1;
+  t.bg=L>=0&&(t.mode==="dark"?L<0.15:L>0.6)?r.bg.toLowerCase():null;
+  t.pattern=PATTERNS.some(x=>x[0]===r.pattern)?r.pattern:"none";
+  t.motif=null;
+  t.radius=RADII[r.radius]?r.radius:"md";
+  t.tint=true;
+  return t.accent?t:null;
+}
+async function themeFromPrompt(){
+  const text=aiIn.value.trim();
+  if(A.busy) return;
+  if(!S.sample){A.busy=true;renderSettings();await loadSample();A.busy=false;if(!S.sample){A.error=NOSAMPLE;renderSettings();return;}}
+  if(!text){A.error="Décris l’ambiance en quelques mots.";renderSettings();return;}
+  A.busy=true;A.error="";A.note="";renderSettings();
+  const ids=PATTERNS.map(x=>x[0]).join("|");
+  const prompt="Tu es designer d'interface. Propose l'apparence d'une application de journal alimentaire d'après cette demande : « "+text+" ».\n"
+    +"Réponds uniquement avec un objet JSON, sans texte autour :\n"
+    +'{"accent":"#rrggbb","bg":"#rrggbb","mode":"light|dark","pattern":"'+ids+'","radius":"sm|md|lg","note":"une phrase facultative","motif":{"name":"nuages et étoiles","tile":64,"shapes":[{"t":"circle","cx":20,"cy":20,"r":8,"fill":"#ffffff","o":0.9},{"t":"path","d":"M40 40 L44 50 L54 50 L46 56 L49 66 L40 60 L31 66 L34 56 L26 50 L36 50 Z","fill":"#ffd54a"}]}}\n'
+    +"Règles : accent assez soutenu pour porter un bouton avec texte lisible ; en mode light, bg très clair (presque blanc teinté) ; en mode dark, bg très sombre ; radius sm = angles droits, lg = très arrondi.\n"
+    +"Motif : si la demande décrit des éléments à répéter (animaux, fruits, nuages, planètes, etc.), dessine-les dans motif : une tuile carrée de 64 (tile), 4 à 20 formes simples, coordonnées dans 0..64. t = circle (cx,cy,r) | ellipse (cx,cy,rx,ry) | rect (x,y,w,h,rx) | line (x1,y1,x2,y2,stroke) | path (d, avec M L H V C Q Z) | polygon (points). Couleurs en #rrggbb dans fill/stroke, sw = épaisseur du trait, o = opacité 0..1. Style mignon et simple, couleurs douces qui laissent le texte lisible, éléments bien espacés dans la tuile, rien qui touche le bord (ou alors symétrique pour que la tuile se raccorde). Mets pattern à \"custom\" quand tu fournis motif ; sinon choisis dans la liste (fleurs → flowers, feuilles → leaves, mer → waves…), none si la demande est sobre.\n"
+    +"Personnages et marques protégés (Kirby, Pokémon, Mario, Disney, Pixar, Marvel, Nintendo, logos de marque, etc.) : ne les dessine pas et ne dessine pas de sosie. Utilise à la place des éléments génériques et originaux dans l'ambiance (nuages, étoiles, cœurs, bulles, petits animaux de ta création) et explique-le en une phrase dans note. Reprends quand même les couleurs et l'ambiance demandées (fond, teintes).";
+  try{
+    const raw=await S.sample.json(prompt,{modelTier:"default"});
+    const t=cleanAI(raw);
+    if(!t) throw {code:"invalid_json"};
+    const mo=cleanMotif(raw&&raw.motif);
+    if(mo){t.motif=mo;t.pattern="custom";}
+    A.note=raw&&typeof raw.note==="string"?raw.note.slice(0,240):"";
+    const prev=plain(cfg().theme);
+    setTheme(t);
+    toast("Apparence appliquée","Annuler",()=>setTheme(prev));
+  }catch(e){A.error=errText(e)||"Je n’ai pas réussi à créer cette apparence. Reformule.";}
+  finally{A.busy=false;renderSettings();}
+}
+
+/* ---------- Profils et réglages ---------- */
+function profName(){const p=S.profiles.find(x=>x.id===S.pid);return p?p.name:"";}
+function switchProfile(pid){
+  S.pid=pid;closeEdit();C.draft=null;C.error="";
+  try{localStorage.setItem("journal-calories-pid",pid);}catch(e){}
+  renderAll();if(!$("#settings").hidden) renderSettings();
+}
+function renderSettings(){
+  const s=cfg(),pid=S.pid,th=s.theme;
+  const pillRow=(t,key,list)=>h("div",{class:"seg",style:"grid-column:1/-1;margin:0",role:"group"},list.map(([v,l])=>h("button",{type:"button",class:"pill"+(t[key]===v?" on":""),text:l,"aria-pressed":String(t[key]===v),onclick:()=>setTheme({[key]:v})})));
+  const save=(key,parse)=>ev=>{pd(pid).settings={...cfg(),[key]:parse(ev.target)};persistSettings(pid);renderSummary();renderWeek();};
+  $("#settings").replaceChildren(
+    h("h3",{},"Profils"),
+    h("div",{class:"prof"},
+      h("button",{type:"button",class:"btn small",text:"Changer de profil",onclick:()=>openGate(false)}),
+      h("button",{type:"button",class:"btn small",text:"Gérer les profils",onclick:()=>openGate(true)})),
+    h("div",{class:"hint wide",style:"grid-column:1/-1;margin:0",text:"Chaque profil a son propre journal, ses objectifs et son apparence. Les recettes sont communes à tous les profils."}),
+    h("hr"),
+    h("h3",{},"Réglages de "+profName()),
+    h("label",{class:"f"},"Objectif (kcal/jour)",h("input",{type:"number",inputmode:"numeric",value:s.goal,onchange:save("goal",el=>Math.max(0,Math.round(num(el.value))))})),
+    h("label",{class:"f"},"Objectif protéines (g, facultatif)",h("input",{type:"number",inputmode:"numeric",value:s.protein||"",onchange:save("protein",el=>Math.max(0,Math.round(num(el.value))))})),
+    h("label",{class:"f"},"Objectif fibres (g, facultatif)",h("input",{type:"number",inputmode:"numeric",value:s.fibre||"",onchange:save("fibre",el=>Math.max(0,Math.round(num(el.value))))})),
+    h("label",{class:"f"},"Poids pour estimer l’activité (kg)",h("input",{type:"number",inputmode:"decimal",step:"0.1",value:s.weight||"",onchange:save("weight",el=>Math.max(0,num(el.value)))})),
+    h("label",{class:"check wide"},
+      h("input",{type:"checkbox",checked:s.addBack,onchange:save("addBack",el=>el.checked)}),
+      h("span",{text:"Ajouter les calories d’activité à mon budget du jour. À décocher si tu préfères garder l’objectif fixe, les estimations d’activité étant approximatives."})),
+    h("hr"),
+    h("h3",{},"Apparence de "+profName()),
+    h("div",{class:"wide",style:"grid-column:1/-1;display:flex;flex-direction:column;gap:6px"},
+      h("label",{class:"f",for:"aiTheme"},"Décris l’ambiance et Claude règle tout"),
+      h("div",{class:"row"},aiIn,h("button",{type:"button",class:"btn small primary",disabled:A.busy,text:A.busy?"Création…":"Créer l’apparence",onclick:themeFromPrompt})),
+      A.error?h("div",{class:"err",role:"alert",text:A.error}):null,
+      A.note?h("div",{class:"hint",style:"margin:0;color:var(--ink)",text:A.note}):null,
+      h("div",{class:"hint",style:"margin:0",text:"Une seule petite demande, envoyée uniquement quand tu cliques. Tu peux ensuite ajuster à la main ci-dessous ou annuler."}),
+      h("div",{class:"sublabel",style:"margin-top:8px",text:"Ou utilise ta propre image comme fond"}),
+      h("div",{class:"prof"},
+        fileBtn(IMG_OK(th.image)?"🖼 Changer l’image de fond":"🖼 Choisir une image de ma galerie",fs=>pickBackground(fs[0]),{primary:!IMG_OK(th.image)}),
+        IMG_OK(th.image)?h("button",{type:"button",class:"btn",text:"Retirer l’image",onclick:()=>setTheme({image:null,pattern:th.pattern==="image"?"none":th.pattern})}):null),
+      th.pattern==="image"&&IMG_OK(th.image)?h("label",{class:"f wide",style:"grid-column:1/-1"},"Voile sur le fond (plus haut = fond plus pâle)",
+        h("input",{type:"range",min:"0",max:"90",step:"5",value:th.veil==null?35:th.veil,
+          oninput:ev=>applyTheme({...th,veil:+ev.target.value}),onchange:ev=>setTheme({veil:+ev.target.value})})):null,
+      h("label",{class:"f wide",style:"grid-column:1/-1"},"Transparence des cartes (là où sont les infos) : plus bas = on voit mieux le fond",
+        h("input",{type:"range",min:"30",max:"100",step:"5",value:th.cardOpacity==null?100:th.cardOpacity,"aria-label":"Opacité des cartes",
+          oninput:ev=>applyTheme({...th,cardOpacity:+ev.target.value}),onchange:ev=>setTheme({cardOpacity:+ev.target.value})}))),
+    h("div",{class:"sublabel",text:"Couleur"}),
+    h("div",{class:"prof sw"},
+      PRESETS.map(pr=>h("button",{type:"button",class:"swatch"+(th.accent==="preset:"+pr.id?" on":""),title:pr.n,"aria-label":pr.n,"aria-pressed":String(th.accent==="preset:"+pr.id),
+        style:"background:"+pr.l,onclick:()=>setTheme({accent:"preset:"+pr.id})})),
+      h("input",{type:"color","aria-label":"Couleur personnalisée",value:/^#[0-9a-f]{6}$/i.test(th.accent||"")?th.accent:"#0d7a58",
+        oninput:ev=>applyTheme({...th,accent:ev.target.value}),onchange:ev=>setTheme({accent:ev.target.value})}),
+      h("button",{type:"button",class:"btn small",text:"Par défaut",onclick:()=>setTheme({accent:null})})),
+    h("label",{class:"check wide"},
+      h("input",{type:"checkbox",checked:th.tint!==false,onchange:ev=>setTheme({tint:ev.target.checked})}),
+      h("span",{text:"Teinter aussi le fond, les cartes et les textes avec cette couleur"})),
+    h("div",{class:"sublabel",text:"Fond (facultatif, clair en mode clair, sombre en mode sombre)"}),
+    h("div",{class:"prof"},
+      h("input",{type:"color","aria-label":"Couleur de fond",value:HEX.test(th.bg||"")?th.bg:"#f2f5f0",onchange:ev=>setTheme({bg:ev.target.value})}),
+      h("button",{type:"button",class:"btn small",text:"Aucun",onclick:()=>setTheme({bg:null})})),
+    h("div",{class:"sublabel",text:"Mode"}),
+    pillRow(th,"mode",[["auto","Auto"],["light","Clair"],["dark","Sombre"]]),
+    h("div",{class:"sublabel",text:"Motif de fond"}),
+    pillRow(th,"pattern",[...PATTERNS,...(cleanMotif(th.motif)?[["custom","Mon motif"]]:[]),...(IMG_OK(th.image)?[["image","Mon image"]]:[])]),
+    h("div",{class:"sublabel",text:"Coins"}),
+    pillRow(th,"radius",[["sm","Carrés"],["md","Arrondis"],["lg","Très arrondis"]]),
+    h("div",{class:"prof"},h("button",{type:"button",class:"btn small",text:"Tout remettre par défaut",onclick:()=>setTheme({...DEFAULT_THEME,image:null,motif:null,veil:null,cardOpacity:100})})));
+  if(window.standaloneSettings) $("#settings").append(window.standaloneSettings(()=>{loadSample();}));
+}
+
+
+/* ---------- Écran « Qui est-ce ? » ---------- */
+const ICONS=["🥑","🍎","🥦","🍓","🥕","🍋","🏃","🧘","🐱","🦊","🐼","🐝","🌿","⭐","🔥","🌙"];
+const G={open:true,manage:false,form:null,confirmDel:false,ready:false,canClose:false};
+function profBg(p){
+  const i=Math.max(0,S.profiles.indexOf(p));
+  const pr=PRESETS.find(x=>x.id===p.color)||PRESETS[i%PRESETS.length];
+  return pr.l;
+}
+const PHOTO_RE=/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]{20,80000}$/;
+const PHOTO_OK=v=>PHOTO_RE.test(v||"")||/^\/_blob\/[0-9a-f]{16,64}$/.test(v||"");
+function avatar(p,size){
+  const bg=profBg(p);
+  if(PHOTO_OK(p.photo)) return h("span",{class:"avatar","aria-hidden":"true",style:"width:"+size+"px;height:"+size+"px;background:"+bg+" url(\""+p.photo+"\") center/cover no-repeat"});
+  return h("span",{class:"avatar","aria-hidden":"true",style:"width:"+size+"px;height:"+size+"px;background:"+bg+";color:"+inkFor(bg)+";font-size:"+Math.round(size*.44)+"px",
+    text:p.icon||((p.name||"?").trim().charAt(0).toUpperCase()||"?")});
+}
+/* ---------- Recadrage de la photo de profil (glisser pour déplacer, pincer ou curseur pour zoomer) ---------- */
+const CR={bmp:null,V:300,min:1,z:1,x:0,y:0,ptr:new Map(),pinch0:null};
+const crClamp=()=>{const w=CR.bmp.width*CR.min*CR.z,hh=CR.bmp.height*CR.min*CR.z;CR.x=Math.min(0,Math.max(CR.V-w,CR.x));CR.y=Math.min(0,Math.max(CR.V-hh,CR.y));};
+function crSetZoom(z,cx,cy){
+  const old=CR.min*CR.z;CR.z=Math.min(4,Math.max(1,z));
+  const nw=CR.min*CR.z,fx=(cx-CR.x)/old,fy=(cy-CR.y)/old;
+  CR.x=cx-fx*nw;CR.y=cy-fy*nw;crClamp();
+}
+function closeCrop(){$("#crop").hidden=true;CR.bmp=null;CR.ptr.clear();}
+async function openCrop(file){
+  toast("Photo reçue ("+fileInfo(file)+"), ouverture du recadrage…");
+  try{CR.bmp=await loadBitmap(file);}
+  catch(e){toast("Impossible de lire cette photo ("+fileInfo(file)+"). Essaie un JPEG ou une capture d’écran.");return;}
+  CR.V=Math.max(200,Math.min(320,innerWidth-48));
+  CR.min=Math.max(CR.V/CR.bmp.width,CR.V/CR.bmp.height);CR.z=1;
+  CR.x=(CR.V-CR.bmp.width*CR.min)/2;CR.y=(CR.V-CR.bmp.height*CR.min)/2;
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const cv=h("canvas",{width:Math.round(CR.V*dpr),height:Math.round(CR.V*dpr)});
+  const draw=()=>{const c=cv.getContext("2d"),k=dpr*CR.min*CR.z;c.fillStyle="#000";c.fillRect(0,0,cv.width,cv.height);
+    c.drawImage(CR.bmp,CR.x*dpr,CR.y*dpr,CR.bmp.width*k,CR.bmp.height*k);};
+  const view=h("div",{class:"cropview",style:"width:"+CR.V+"px;height:"+CR.V+"px"},cv);
+  const zoom=h("input",{type:"range",min:"1",max:"4",step:"0.01",value:"1","aria-label":"Zoom",
+    oninput:ev=>{crSetZoom(+ev.target.value,CR.V/2,CR.V/2);draw();}});
+  const pos=ev=>{const r=view.getBoundingClientRect();return {x:ev.clientX-r.left,y:ev.clientY-r.top};};
+  view.addEventListener("pointerdown",ev=>{view.setPointerCapture(ev.pointerId);CR.ptr.set(ev.pointerId,pos(ev));CR.pinch0=null;});
+  view.addEventListener("pointermove",ev=>{
+    if(!CR.ptr.has(ev.pointerId)) return;
+    const prev=CR.ptr.get(ev.pointerId),cur=pos(ev);CR.ptr.set(ev.pointerId,cur);
+    if(CR.ptr.size===1){CR.x+=cur.x-prev.x;CR.y+=cur.y-prev.y;crClamp();draw();}
+    else if(CR.ptr.size===2){
+      const [a,b]=[...CR.ptr.values()],d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(CR.pinch0){crSetZoom(CR.pinch0.z*d/CR.pinch0.d,(a.x+b.x)/2,(a.y+b.y)/2);zoom.value=CR.z;draw();}
+      else CR.pinch0={d:Math.max(1,d),z:CR.z};
+    }
+  });
+  const up=ev=>{CR.ptr.delete(ev.pointerId);CR.pinch0=null;};
+  view.addEventListener("pointerup",up);view.addEventListener("pointercancel",up);
+  view.addEventListener("wheel",ev=>{ev.preventDefault();const q=pos(ev);crSetZoom(CR.z*(ev.deltaY<0?1.08:1/1.08),q.x,q.y);zoom.value=CR.z;draw();},{passive:false});
+  const validate=()=>{
+    const out=document.createElement("canvas");out.width=out.height=192;
+    const k=192/CR.V,c=out.getContext("2d"),sc=CR.min*CR.z*k;
+    c.fillStyle="#fff";c.fillRect(0,0,192,192);
+    c.drawImage(CR.bmp,CR.x*k,CR.y*k,CR.bmp.width*sc,CR.bmp.height*sc);
+    const url=out.toDataURL("image/jpeg",0.85);
+    if(!PHOTO_RE.test(url)){toast("Photo non utilisable.");return;}
+    if(G.form) G.form.photo=url;
+    closeCrop();renderGate();
+  };
+  $("#crop").replaceChildren(h("h2",{text:"Recadre ta photo"}),view,zoom,
+    h("p",{class:"hintw",text:"Glisse pour déplacer, pince ou utilise le curseur pour zoomer."}),
+    h("div",{class:"row",style:"justify-content:center"},
+      h("button",{type:"button",class:"btn primary",text:"Valider",onclick:validate}),
+      h("button",{type:"button",class:"btn",text:"Annuler",onclick:closeCrop})));
+  $("#crop").hidden=false;draw();
+}
+document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&!$("#crop").hidden) closeCrop();});
+function renderProfBtn(){
+  const p=S.profiles.find(x=>x.id===S.pid);
+  $("#profBtn").replaceChildren(...(p?[avatar(p,26),h("span",{text:p.name})]:[]));
+}
+function openGate(manage){
+  G.open=true;G.manage=!!manage;G.form=null;G.confirmDel=false;
+  closeEdit();renderGate();
+}
+function enterProfile(pid,fresh){
+  G.open=false;G.canClose=true;G.form=null;
+  switchProfile(pid);
+  renderGate();
+  if(fresh){$("#settings").hidden=false;$("#btnSettings").setAttribute("aria-expanded","true");renderSettings();toast("Profil créé : règle ton objectif dans Réglages");}
+}
+function openForm(p){
+  G.confirmDel=false;
+  G.form=p?{id:p.id,name:p.name,color:p.color||PRESETS[Math.max(0,S.profiles.indexOf(p))%PRESETS.length].id,icon:p.icon||"",photo:PHOTO_OK(p.photo)?p.photo:""}
+          :{id:null,name:"",color:PRESETS[S.profiles.length%PRESETS.length].id,icon:"",photo:""};
+  renderGate();
+  const n=document.getElementById("gName");if(n) n.focus();
+}
+function saveForm(){
+  const f=G.form,name=f.name.trim().slice(0,24);
+  if(!name){toast("Donne un nom au profil");return;}
+  if(f.id){
+    const p=S.profiles.find(x=>x.id===f.id);
+    if(p){p.name=name;p.color=f.color;p.icon=f.icon;if(f.photo) p.photo=f.photo; else delete p.photo;}
+    persistProfiles();G.form=null;renderProfBtn();renderGate();
+  } else {
+    const p={id:newPid(),name,color:f.color,icon:f.icon};if(f.photo) p.photo=f.photo;
+    S.profiles.push(p);pd(p.id);persistProfiles();persistSettings(p.id);
+    G.form=null;
+    if(G.manage){renderGate();} else enterProfile(p.id,true);
+  }
+}
+function deleteForm(){
+  const f=G.form;
+  if(!f.id||S.profiles.length<2) return;
+  if(!G.confirmDel){G.confirmDel=true;renderGate();return;}
+  removeProfileStore(f.id);delete S.data[f.id];
+  S.profiles=S.profiles.filter(x=>x.id!==f.id);persistProfiles();
+  if(S.pid===f.id) S.pid=S.profiles[0].id;
+  G.form=null;G.confirmDel=false;renderProfBtn();renderGate();
+}
+function renderGate(){
+  const g=$("#gate"),wrap=document.querySelector(".wrap");
+  g.hidden=!G.open;
+  if(wrap){if(G.open) wrap.setAttribute("inert",""); else wrap.removeAttribute("inert");}
+  if(!G.open) return;
+  if(!G.ready){g.replaceChildren(h("h1",{text:"Journal calories"}),h("p",{class:"muted",text:"Chargement de tes profils…"}));return;}
+  const f=G.form;
+  const tiles=S.profiles.map(p=>h("button",{type:"button",class:"tile",onclick:()=>G.manage?openForm(p):enterProfile(p.id,false),
+    "aria-label":(G.manage?"Modifier ":"Ouvrir ")+p.name},
+    h("span",{class:"av"},avatar(p,112),G.manage?h("span",{class:"pen",text:"Modifier"}):null),
+    h("span",{class:"nm",text:p.name})));
+  tiles.push(h("button",{type:"button",class:"tile add",onclick:()=>openForm(null),"aria-label":"Ajouter un profil"},
+    h("span",{class:"av"},h("span",{class:"avatar",style:"width:112px;height:112px","aria-hidden":"true",text:"+"})),
+    h("span",{class:"nm",text:"Ajouter un profil"})));
+  const kids=[h("h1",{text:G.manage?"Gérer les profils":"Qui est-ce ?"}),h("div",{class:"tiles"},tiles)];
+  if(f){
+    const prev={name:f.name,color:f.color,icon:f.icon,photo:f.photo};
+    const nameIn=h("input",{type:"text",id:"gName",maxlength:"24",placeholder:"Prénom ou surnom",value:f.name,"aria-label":"Nom du profil",
+      oninput:ev=>{f.name=ev.target.value;},onkeydown:ev=>{if(ev.key==="Enter") saveForm();}});
+    kids.push(h("section",{class:"card gateform"},
+      h("h2",{text:f.id?"Modifier le profil":"Nouveau profil"}),
+      h("div",{class:"top"},avatar(Object.assign({},prev,{id:f.id}),64),nameIn),
+      h("div",{class:"sublabel",text:"Photo (facultatif)"}),
+      h("div",{class:"prof"},
+        fileBtn(f.photo?"🖼 Changer la photo":"🖼 Choisir une photo",fs=>openCrop(fs[0]),{small:true}),
+        fileBtn("📷 Selfie",fs=>openCrop(fs[0]),{small:true,capture:"user"}),
+        f.photo?h("button",{type:"button",class:"btn small",text:"Retirer la photo",onclick:()=>{f.photo="";renderGate();}}):null),
+      h("div",{class:"sublabel",text:"Couleur"}),
+      h("div",{class:"prof"},PRESETS.map(pr=>h("button",{type:"button",class:"swatch"+(f.color===pr.id?" on":""),title:pr.n,"aria-label":pr.n,"aria-pressed":String(f.color===pr.id),
+        style:"background:"+pr.l,onclick:()=>{f.color=pr.id;renderGate();document.getElementById("gName").focus();}}))),
+      h("div",{class:"sublabel",text:"Icône (facultatif)"}),
+      h("div",{class:"icons"},
+        h("button",{type:"button",class:"pill"+(!f.icon?" on":""),text:"Aa","aria-label":"Initiale",onclick:()=>{f.icon="";renderGate();}}),
+        ICONS.map(ic=>h("button",{type:"button",class:"pill"+(f.icon===ic?" on":""),text:ic,onclick:()=>{f.icon=ic;renderGate();}}))),
+      h("div",{class:"row"},
+        h("button",{type:"button",class:"btn primary",text:f.id?"Enregistrer":"Créer le profil",onclick:saveForm}),
+        h("button",{type:"button",class:"btn",text:"Annuler",onclick:()=>{G.form=null;G.confirmDel=false;renderGate();}}),
+        h("span",{class:"spacer"}),
+        f.id&&S.profiles.length>1?h("button",{type:"button",class:"btn danger",text:G.confirmDel?"Confirmer (efface son journal)":"Supprimer",onclick:deleteForm}):null)));
+  }
+  const bottom=[h("button",{type:"button",class:"btn",text:G.manage?"Terminé":"Gérer les profils",onclick:()=>{G.manage=!G.manage;G.form=null;G.confirmDel=false;renderGate();}})];
+  if(G.canClose&&!G.manage) bottom.push(h("button",{type:"button",class:"btn",text:"Retour à "+profName(),onclick:()=>{G.open=false;renderGate();}}));
+  kids.push(h("div",{class:"row",style:"justify-content:center"},bottom));
+  g.replaceChildren(...kids);
+}
+document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&G.open&&G.canClose&&!G.form){G.open=false;renderGate();}});
+
+/* ---------- Rendu global et événements ---------- */
+// Chaque partie s'affiche indépendamment : une erreur dans l'une n'empêche pas les autres, et elle est visible.
+const safe=(id,fn)=>{try{fn();}catch(e){const el=document.getElementById(id);if(el) el.replaceChildren(h("div",{class:"err",text:"Erreur d’affichage : "+(e&&e.message||e)}));}};
+function renderAll(){
+  safe("viewJournal",applyTheme);safe("profBtn",renderProfBtn);
+  if(!document.activeElement.closest?.("#gate")) safe("gate",renderGate);
+  safe("datebar",renderDate);safe("summary",renderSummary);safe("meals",renderMeals);safe("acts",renderActs);safe("week",renderWeek);safe("weightPane",renderWeightPane);
+  if(!document.activeElement.closest?.("#side")) safe("recipeList",renderRecipeList);
+  if(!$("#cal").hidden) safe("cal",renderCal);
+  if(!C.busy&&!document.activeElement.closest?.("#composer")) safe("composer",renderComposer);
+}
+const SIDE=["recipes","new","week","weight"];
+const TABS=[["journal","Journal"],["recipes","Recettes"],["new","+ Recette"],["week","Semaine"],["weight","Poids"]];
+const wideMq=window.matchMedia?window.matchMedia("(min-width:960px)"):{matches:false};
+function renderTabs(){
+  const mk=list=>list.map(([id,label])=>h("button",{type:"button",class:"pill"+(S.view===id?" on":""),text:label,onclick:()=>setView(id)}));
+  $("#mainTabs").replaceChildren(...mk(TABS));
+  $("#sideTabs").replaceChildren(...mk(TABS.filter(t=>t[0]!=="journal")));
+}
+function setView(v){
+  S.view=v;
+  if(SIDE.includes(v)) S.side=v;
+  applyView();
+  if(v==="new") renderRecipeNew();
+  if(v==="recipes") renderRecipeList();
+  if(v==="week") renderWeek();
+  if(v==="weight") renderWeightPane();
+}
+function applyView(){
+  const wide=wideMq.matches,side=SIDE.includes(S.view)?S.view:S.side;
+  $("#viewJournal").hidden=!wide&&S.view!=="journal";
+  $("#side").hidden=!wide&&S.view==="journal";
+  $("#paneRecipes").hidden=side!=="recipes";
+  $("#paneNew").hidden=side!=="new";
+  $("#paneWeek").hidden=side!=="week";
+  $("#paneWeight").hidden=side!=="weight";
+  renderTabs();
+}
+if(wideMq.addEventListener) wideMq.addEventListener("change",applyView);
+
+/* ---------- Calendrier intégré ---------- */
+let calMonth=S.date.slice(0,7);
+function renderCal(){
+  const box=$("#cal");
+  const [y,m]=calMonth.split("-").map(Number);
+  const first=new Date(y,m-1,1),lead=(first.getDay()+6)%7;
+  const start=new Date(y,m-1,1-lead);
+  const todayS=ds(new Date());
+  const shift=n=>{const d=new Date(y,m-1+n,1);calMonth=d.getFullYear()+"-"+pad(d.getMonth()+1);renderCal();};
+  const cells=[...Array(42)].map((_,i)=>{
+    const d=new Date(start.getFullYear(),start.getMonth(),start.getDate()+i),date=ds(d);
+    const t=totals(getDay(date));
+    return h("button",{type:"button",
+      class:"d"+(d.getMonth()!==m-1?" out":"")+(date===todayS?" today":"")+(date===S.date?" sel":"")+(t.kcal>0||t.burned>0?" has":""),
+      "aria-label":d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"}),
+      onclick:()=>{closeCal();go(date);},text:String(d.getDate())});
+  });
+  box.replaceChildren(
+    h("div",{class:"ch"},
+      h("button",{type:"button",class:"pill","aria-label":"Mois précédent",text:"←",onclick:()=>shift(-1)}),
+      h("b",{text:first.toLocaleDateString("fr-FR",{month:"long",year:"numeric"})}),
+      h("button",{type:"button",class:"pill","aria-label":"Mois suivant",text:"→",onclick:()=>shift(1)})),
+    h("div",{class:"grid"},["L","M","M","J","V","S","D"].map(x=>h("div",{class:"dow",text:x})),cells));
+}
+function openCal(){calMonth=S.date.slice(0,7);renderCal();$("#cal").hidden=false;$("#pick").setAttribute("aria-expanded","true");}
+function closeCal(){$("#cal").hidden=true;$("#pick").setAttribute("aria-expanded","false");}
+function go(date){S.date=date;closeEdit();renderAll();}
+$("#profBtn").addEventListener("click",()=>openGate(false));
+$("#prev").addEventListener("click",()=>go(addDays(S.date,-1)));
+$("#next").addEventListener("click",()=>go(addDays(S.date,1)));
+$("#today").addEventListener("click",()=>go(ds(new Date())));
+$("#pick").addEventListener("click",()=>{if($("#cal").hidden) openCal(); else closeCal();});
+document.addEventListener("click",ev=>{if($("#cal").hidden) return;const bar=document.querySelector(".datebar");if(!(ev.composedPath?ev.composedPath():[]).includes(bar)) closeCal();});
+document.addEventListener("keydown",ev=>{if(ev.key==="Escape") closeCal();});
+$("#btnSettings").addEventListener("click",()=>{
+  const s=$("#settings");s.hidden=!s.hidden;$("#btnSettings").setAttribute("aria-expanded",String(!s.hidden));
+  if(!s.hidden) renderSettings();
+});
+document.addEventListener("keydown",ev=>{
+  if(!$("#cal").hidden||(ev.target&&/INPUT|TEXTAREA|SELECT/.test(ev.target.tagName))) return;
+  if(ev.key==="ArrowLeft") go(addDays(S.date,-1));
+  if(ev.key==="ArrowRight") go(addDays(S.date,1));
+});
+
+/* ---------- Démarrage ---------- */
+const use=n=>window.claude&&window.claude.use?window.claude.use(n):Promise.resolve(null);
+const NOSAMPLE=window.STANDALONE?"Pour estimer avec Claude, ajoute ta clé API dans Réglages (section « Estimation par Claude »). Tu peux quand même ajouter les lignes à la main.":"Claude n’est pas joignable depuis cette vue, donc pas d’estimation. Ouvre le journal depuis l’onglet Artifacts de l’appli Claude (pas depuis un raccourci), puis réessaie. Tu peux quand même ajouter les lignes à la main.";
+async function loadSample(){
+  try{
+    S.sample=await use("sample");
+    if(S.sample&&S.sample.limits) S.limits=await S.sample.limits().catch(()=>null);
+  }catch(e){S.sample=null;}
+  S.sampleTried=true;
+  try{renderComposer();renderRecipeNew();}catch(e){}
+  return S.sample;
+}
+function pickActive(){
+  let want=null;
+  try{want=localStorage.getItem("journal-calories-pid");}catch(e){}
+  S.pid=S.profiles.some(p=>p.id===want)?want:(S.profiles.some(p=>p.id===S.pid)?S.pid:S.profiles[0].id);
+}
+function applySnapshot(docs){
+  const data={},recipes={};let list=null;
+  const get=pid=>data[pid]||(data[pid]={days:{},settings:{...DEFAULTS}});
+  docs.forEach(doc=>{
+    const raw=doc.data(),id=doc.id;let m;
+    const v=raw&&typeof raw==='object'?plain(raw):raw; // copie modifiable : le stockage livre des objets en lecture seule
+    if(id==="profiles"){list=v&&Array.isArray(v.list)?v.list:null;}
+    else if((m=reDay.exec(id))) get(m[1]||"main").days[m[2]]=v;
+    else if((m=reSet.exec(id))) get(m[1]||"main").settings={...DEFAULTS,...v};
+    else if(id.indexOf("recipe-")===0&&v&&v.id) recipes[v.id]=v;
+  });
+  S.data=data;S.recipes=recipes;
+  S.profiles=list&&list.length?list.filter(p=>p&&p.id&&p.name):[{id:"main",name:"Moi"}];
+  if(!S.profiles.length) S.profiles=[{id:"main",name:"Moi"}];
+  pickActive();
+}
+async function init(){
+  applyView();renderRecipeNew();renderGate();renderAll();
+  let db=null,uid=null;
+  try{const u=await use("user");uid=u?await u.id():null;db=uid?await use("db"):null;}catch(e){}
+  loadSample();
+  if(db&&uid){
+    S.mode="db";S.db=db;S.uid=uid;
+    setStatus("Synchronisation…");
+    setTimeout(()=>{if(!G.ready){G.ready=true;renderGate();}},3500);
+    const slow=setTimeout(()=>setStatus("Connexion lente, les données peuvent être en retard",true),10000);
+    col().onSnapshot(snap=>{
+      if(!snap.metadata.fromCache){clearTimeout(slow);setStatus("");G.ready=true;}
+      applySnapshot(snap.docs);
+      renderAll();
+      if(!$("#settings").hidden&&!document.activeElement.closest?.("#settings")) renderSettings();
+    },err=>{clearTimeout(slow);setStatus("Sauvegarde indisponible ("+(err&&err.code||"erreur")+")",true);});
+  } else {
+    S.mode="local";
+    try{
+      const raw=JSON.parse(localStorage.getItem("journal-calories-v2")||"null");
+      if(raw){S.profiles=raw.profiles||S.profiles;S.data=raw.data||{};S.recipes=raw.recipes||{};}
+      else{
+        const old=JSON.parse(localStorage.getItem("journal-calories-v1")||"null");
+        if(old) S.data={main:{days:old.days||{},settings:{...DEFAULTS,...(old.settings||{})}}};
+      }
+    }catch(e){}
+    pickActive();
+    if(!window.STANDALONE) setStatus("Enregistré dans ce navigateur seulement",true);
+    G.ready=true;
+    renderAll();
+  }
+}
+init();
+})();
+</script>
+</body>
+</html>
